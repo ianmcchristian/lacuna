@@ -1,7 +1,38 @@
 import { useEffect, useRef } from "react";
 import { Scan, overlayUrl } from "./api";
 
-const percent = (value: number | null) => (value === null ? "Not enough products to judge" : `${Math.round(value * 100)}%`);
+const percent = (value: number | null) => (value === null ? "Unknown" : `${Math.round(value * 100)}%`);
+
+function Verdict({ scan }: { scan: Scan }) {
+  // no occupancy means no row had enough products to measure, so don't call it full
+  if (scan.occupancy === null) {
+    return <p>Not enough products found to check for gaps. Try a clearer photo taken straight on.</p>;
+  }
+  if (scan.gaps.length === 0) return <p>No gaps found. This shelf looks fully stocked.</p>;
+  return (
+    <table>
+      <caption>Gaps by shelf row, top row is 1</caption>
+      <thead>
+        <tr>
+          <th scope="col">Row</th>
+          <th scope="col">From x (px)</th>
+          <th scope="col">To x (px)</th>
+          <th scope="col">Width in products</th>
+        </tr>
+      </thead>
+      <tbody>
+        {scan.gaps.map((gap, i) => (
+          <tr key={i}>
+            <td>{gap.row + 1}</td>
+            <td>{Math.round(gap.x1)}</td>
+            <td>{Math.round(gap.x2)}</td>
+            <td>{gap.width_ratio.toFixed(1)}</td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  );
+}
 
 export function ScanResult({ scan }: { scan: Scan }) {
   const heading = useRef<HTMLHeadingElement>(null);
@@ -42,31 +73,7 @@ export function ScanResult({ scan }: { scan: Scan }) {
         <figcaption>Green outlines are products. Red shaded boxes are gaps.</figcaption>
       </figure>
 
-      {scan.gaps.length > 0 ? (
-        <table>
-          <caption>Gaps by shelf row, top row is 1</caption>
-          <thead>
-            <tr>
-              <th scope="col">Row</th>
-              <th scope="col">From x (px)</th>
-              <th scope="col">To x (px)</th>
-              <th scope="col">Width in products</th>
-            </tr>
-          </thead>
-          <tbody>
-            {scan.gaps.map((gap, i) => (
-              <tr key={i}>
-                <td>{gap.row + 1}</td>
-                <td>{Math.round(gap.x1)}</td>
-                <td>{Math.round(gap.x2)}</td>
-                <td>{gap.width_ratio.toFixed(1)}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      ) : (
-        <p>No gaps found. This shelf looks fully stocked.</p>
-      )}
+      <Verdict scan={scan} />
     </section>
   );
 }

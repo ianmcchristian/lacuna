@@ -68,6 +68,28 @@ describe("App", () => {
     expect(input).toHaveFocus();
   });
 
+  it("clears the error once a photo is chosen", async () => {
+    const user = userEvent.setup();
+    render(<App />);
+    await user.click(screen.getByRole("button", { name: "Scan shelf" }));
+    await user.upload(screen.getByLabelText("Shelf photo"), photo());
+
+    expect(screen.queryByText("Choose a shelf photo.")).not.toBeInTheDocument();
+    expect(screen.getByLabelText("Shelf photo")).not.toHaveAttribute("aria-invalid");
+  });
+
+  it("doesn't call an unreadable photo fully stocked", async () => {
+    const empty = { ...scan, product_count: 0, gap_count: 0, occupancy: null, gaps: [] };
+    mockApi({ status: 201, body: { id: "img1" } }, { status: 201, body: empty });
+    const user = userEvent.setup();
+    render(<App />);
+    await user.upload(screen.getByLabelText("Shelf photo"), photo());
+    await user.click(screen.getByRole("button", { name: "Scan shelf" }));
+
+    expect(await screen.findByText(/Not enough products found/)).toBeInTheDocument();
+    expect(screen.queryByText(/fully stocked/)).not.toBeInTheDocument();
+  });
+
   it("rejects a non-image before uploading", async () => {
     const fetchMock = mockApi();
     const user = userEvent.setup({ applyAccept: false });

@@ -46,6 +46,7 @@ export function UploadForm({ busy, onScan }: Props) {
           name="photo"
           type="file"
           accept="image/jpeg,image/png,image/webp"
+          onChange={() => setFileError(null)}
           aria-describedby={fileError ? "photo-hint photo-error" : "photo-hint"}
           aria-invalid={fileError ? true : undefined}
         />
@@ -68,6 +69,7 @@ export function UploadForm({ busy, onScan }: Props) {
           type="text"
           autoComplete="off"
           spellCheck={false}
+          onChange={() => setShelfError(null)}
           aria-describedby={shelfError ? "shelf-hint shelf-error" : "shelf-hint"}
           aria-invalid={shelfError ? true : undefined}
         />
