@@ -103,26 +103,21 @@ jobs:
           jq -e '.product_count > 0' scan.json
           docker logs lacuna | tail -5
 
-  deploy:
+  # Render deploys main once these checks pass, so the schema is always ready first
+  migrate:
     needs: [test, web, image]
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     concurrency:
-      group: deploy
+      group: migrate
       cancel-in-progress: false
-    environment:
-      name: huggingface
-      url: https://ianmcchristian-lacuna.hf.space/docs
     env:
       LACUNA_DATABASE_URL: ${{ secrets.LACUNA_DATABASE_URL }}
-      HF_TOKEN: ${{ secrets.HF_TOKEN }}
     steps:
       - uses: actions/checkout@v4
       - uses: astral-sh/setup-uv@v6
         with:
           enable-cache: true
-      - run: uv sync --locked
+      - run: uv sync --locked --no-dev
       - name: Migrate Neon
-        run: uv run alembic upgrade head
-      - name: Deploy to Hugging Face Space
-        run: uv run python scripts/deploy_space.py
+        run: uv run --no-dev alembic upgrade head

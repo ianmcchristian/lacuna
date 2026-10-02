@@ -1,17 +1,19 @@
-# Free Spaces sleep after 48h with no traffic. One request a day keeps the demo awake.
+# Render's free plan sleeps after 15 min with no traffic, and waking takes about a minute.
+# Pinging every 10 min keeps the demo responsive. One service running all month fits
+# inside the free plan's 750 instance hours.
 name: keepalive
 
 on:
   schedule:
-    - cron: "17 14 * * *"
+    - cron: "*/10 * * * *"
   workflow_dispatch:
 
 permissions: {}
 
 jobs:
   ping:
+    if: vars.LACUNA_API_URL != ''
     runs-on: ubuntu-latest
     steps:
       - name: Ping the API
-        # a sleeping Space can take a minute or two to wake
-        run: curl -sf --retry 10 --retry-delay 15 --retry-all-errors --max-time 30 https://ianmcchristian-lacuna.hf.space/health
+        run: curl -sf --retry 6 --retry-delay 20 --retry-all-errors --max-time 30 "${{ vars.LACUNA_API_URL }}/health"

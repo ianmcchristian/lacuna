@@ -31,7 +31,6 @@ packages = ["lacuna"]
 [dependency-groups]
 dev = [
     "httpx>=0.27",
-    "huggingface-hub>=2.1.1",
     "mypy>=1.13",
     "pytest>=8.3",
     "pytest-cov>=6.0",

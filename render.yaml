@@ -1,0 +1,16 @@
+# Render blueprint for the public API. Free plan: 512 MB RAM, sleeps after 15 min idle.
+# Render deploys main only after the GitHub checks (and the Neon migration in CI) pass.
+services:
+  - type: web
+    name: lacuna
+    runtime: docker
+    plan: free
+    region: virginia # same AWS region as the Neon database
+    branch: main
+    autoDeployTrigger: checksPass
+    healthCheckPath: /health
+    envVars:
+      - key: LACUNA_DATABASE_URL
+        sync: false # Neon connection string, entered once in the Render dashboard
+      - key: LACUNA_CORS_ORIGINS
+        value: '["https://ianmcchristian.github.io", "http://localhost:5173"]'
