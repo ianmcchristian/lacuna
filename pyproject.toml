@@ -58,6 +58,8 @@ ignore_missing_imports = true
 testpaths = ["tests"]
 addopts = "-ra"
 markers = ["model: needs the real ONNX weights in models/"]
+# upstream: starlette wants httpx2 for TestClient, nothing to fix on our side yet
+filterwarnings = ["ignore:Using `httpx` with `starlette.testclient`"]
 
 [tool.coverage.run]
 source = ["lacuna"]

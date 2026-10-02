@@ -1,0 +1,67 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: lacuna
+          POSTGRES_PASSWORD: lacuna
+          POSTGRES_DB: lacuna_test
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      LACUNA_TEST_DATABASE_URL: postgresql+psycopg://lacuna:lacuna@localhost:5432/lacuna_test
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: astral-sh/setup-uv@v6
+        with:
+          enable-cache: true
+
+      - run: uv sync --locked
+
+      - name: Cache model weights
+        uses: actions/cache@v4
+        with:
+          path: models/*.onnx
+          key: weights-sku110k-yolo11-s640-v1
+
+      - run: uv run python scripts/download_weights.py s
+
+      - name: Lint
+        run: |
+          uv run ruff check .
+          uv run ruff format --check .
+
+      - name: Type check
+        run: uv run mypy lacuna tests scripts
+
+      - name: Test (Postgres)
+        run: uv run pytest --cov --cov-report=term-missing
+
+  image:
+    needs: test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - name: Build image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: false
+          tags: lacuna:ci
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
