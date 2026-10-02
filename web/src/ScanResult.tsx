@@ -1,0 +1,72 @@
+import { useEffect, useRef } from "react";
+import { Scan, overlayUrl } from "./api";
+
+const percent = (value: number | null) => (value === null ? "Not enough products to judge" : `${Math.round(value * 100)}%`);
+
+export function ScanResult({ scan }: { scan: Scan }) {
+  const heading = useRef<HTMLHeadingElement>(null);
+
+  // move focus to the new results so keyboard and screen reader users land on them
+  useEffect(() => heading.current?.focus(), [scan.id]);
+
+  const gapWord = scan.gap_count === 1 ? "gap" : "gaps";
+  const alt = `Shelf photo with ${scan.product_count} products outlined in green and ${scan.gap_count} ${gapWord} shaded red.`;
+
+  return (
+    <section aria-labelledby="result-heading">
+      <h2 id="result-heading" ref={heading} tabIndex={-1}>
+        Results
+      </h2>
+
+      <dl className="summary">
+        <div>
+          <dt>Gaps found</dt>
+          <dd>{scan.gap_count}</dd>
+        </div>
+        <div>
+          <dt>Products found</dt>
+          <dd>{scan.product_count}</dd>
+        </div>
+        <div>
+          <dt>Shelf occupancy</dt>
+          <dd>{percent(scan.occupancy)}</dd>
+        </div>
+        <div>
+          <dt>Inference time</dt>
+          <dd>{Math.round(scan.latency_ms)} ms</dd>
+        </div>
+      </dl>
+
+      <figure>
+        <img src={overlayUrl(scan.id)} alt={alt} />
+        <figcaption>Green outlines are products. Red shaded boxes are gaps.</figcaption>
+      </figure>
+
+      {scan.gaps.length > 0 ? (
+        <table>
+          <caption>Gaps by shelf row, top row is 1</caption>
+          <thead>
+            <tr>
+              <th scope="col">Row</th>
+              <th scope="col">From x (px)</th>
+              <th scope="col">To x (px)</th>
+              <th scope="col">Width in products</th>
+            </tr>
+          </thead>
+          <tbody>
+            {scan.gaps.map((gap, i) => (
+              <tr key={i}>
+                <td>{gap.row + 1}</td>
+                <td>{Math.round(gap.x1)}</td>
+                <td>{Math.round(gap.x2)}</td>
+                <td>{gap.width_ratio.toFixed(1)}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      ) : (
+        <p>No gaps found. This shelf looks fully stocked.</p>
+      )}
+    </section>
+  );
+}

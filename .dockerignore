@@ -13,3 +13,6 @@ tests
 *.db
 .env
 .env.*
+
+web/node_modules
+web/dist

@@ -19,3 +19,7 @@ models/*.onnx
 samples/
 uploads/
 *.db
+
+# web
+web/node_modules/
+web/dist/

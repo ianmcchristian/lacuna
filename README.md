@@ -75,6 +75,14 @@ Try the model on a photo without the API:
 uv run python scripts/annotate.py path/to/shelf.jpg   # writes shelf.overlay.jpg
 ```
 
+The upload UI (React + TypeScript, Vite) lives in `web/`:
+
+```bash
+cd web && npm install
+npm run dev          # localhost:5173, talks to the API on :8000
+npm test             # includes axe accessibility checks
+```
+
 With Docker (API + Postgres + migrations):
 
 ```bash
@@ -96,6 +104,16 @@ empty, corrupt), the gap logic, pre/post-processing, the SQL reports, and a
 check that the Alembic migrations match the models. With the weights
 downloaded, it also runs the real model, inpaints one product out of a shelf
 photo, and checks a gap shows up in that spot.
+
+## Accessibility
+
+The UI targets WCAG 2.2 AA: every input has a visible label and hint wired up
+with `aria-describedby`, errors are announced and move focus to the field,
+scan progress uses a live region, focus moves to the results when they load,
+there's a skip link and a visible focus ring, buttons are at least 44x44 px,
+and gaps are listed in a table so the result doesn't rely on color. Tests run
+axe-core on the page before and after a scan and walk the form by keyboard.
+Color contrast is at least 6.67:1 for text.
 
 ## Design notes
 
