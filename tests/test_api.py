@@ -4,7 +4,10 @@ from collections.abc import Callable
 
 from fastapi.testclient import TestClient
 
-from tests.conftest import FAKE_BOXES, image_bytes
+from lacuna.api.deps import get_detector
+from lacuna.config import Settings
+from lacuna.main import create_app
+from tests.conftest import FAKE_BOXES, FakeDetector, image_bytes
 
 
 def test_health(client: TestClient) -> None:
@@ -87,6 +90,24 @@ def test_detect_and_fetch_result(client: TestClient, upload: Callable[..., str])
     fetched = client.get(f"/results/{scan['id']}")
     assert fetched.status_code == 200
     assert fetched.json() == scan
+
+
+def test_upload_survives_restart(
+    client: TestClient, upload: Callable[..., str], settings: Settings, fake_detector: FakeDetector
+) -> None:
+    """Bytes live in the database, so a fresh replica can scan an upload it never saw."""
+    image_id = upload()
+    other = create_app(settings)
+    other.dependency_overrides[get_detector] = lambda: fake_detector
+    with TestClient(other) as replica:
+        assert replica.post("/detect", json={"image_id": image_id}).status_code == 201
+
+
+def test_large_upload_stored_smaller(client: TestClient) -> None:
+    big = image_bytes(".jpg", size=(1500, 3000))  # 3000 px wide
+    resp = client.post("/images", files={"file": ("big.jpg", big, "image/jpeg")})
+    assert resp.status_code == 201
+    assert (resp.json()["width"], resp.json()["height"]) == (2048, 1024)
 
 
 def test_detect_unknown_image(client: TestClient) -> None:

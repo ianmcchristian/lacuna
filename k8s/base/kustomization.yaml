@@ -1,8 +1,5 @@
-# Local kind cluster:
-#   kind create cluster --name lacuna
-#   docker build -t lacuna:local . && kind load docker-image lacuna:local --name lacuna
-#   kubectl create secret generic lacuna-db --from-literal=database-url='postgresql+psycopg://...'
-#   kubectl apply -k k8s/
+# Base manifests. Expects a lacuna-db Secret with a database-url key.
+# For a local kind cluster with its own Postgres, apply k8s/local instead.
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 labels:

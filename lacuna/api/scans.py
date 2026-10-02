@@ -4,7 +4,7 @@ from typing import Annotated, Any
 
 from fastapi import APIRouter, File, Form, HTTPException, Response, UploadFile
 
-from lacuna.api.deps import DetectorDep, SessionDep, SettingsDep, StoreDep
+from lacuna.api.deps import DetectorDep, SessionDep, SettingsDep
 from lacuna.db.models import ImageRecord
 from lacuna.imaging import encode_jpeg
 from lacuna.schemas import SHELF_CODE, DetectRequest, ImageOut, ScanOut
@@ -47,7 +47,6 @@ def to_image_out(record: ImageRecord) -> ImageOut:
 )
 def upload_image(
     session: SessionDep,
-    store: StoreDep,
     settings: SettingsDep,
     file: Annotated[UploadFile, File(description="Shelf photo: jpeg, png, or webp")],
     shelf: Annotated[str | None, Form(pattern=SHELF_CODE, description="e.g. aisle4-bay2")] = None,
@@ -57,7 +56,6 @@ def upload_image(
     try:
         record = save_upload(
             session,
-            store,
             data=data,
             filename=file.filename or "upload",
             content_type=file.content_type or "",
@@ -73,13 +71,12 @@ def upload_image(
 def detect(
     body: DetectRequest,
     session: SessionDep,
-    store: StoreDep,
     detector: DetectorDep,
     settings: SettingsDep,
 ) -> ScanOut:
     """Find products and gaps in an uploaded image and save the scan."""
     try:
-        scan = run_scan(session, store, detector, body.image_id, settings.min_gap_ratio)
+        scan = run_scan(session, detector, body.image_id, settings.min_gap_ratio)
     except NotFoundError as err:
         raise HTTPException(404, str(err)) from err
     return ScanOut.model_validate(scan)
@@ -98,11 +95,11 @@ def get_result(scan_id: str, session: SessionDep) -> ScanOut:
     response_class=Response,
     responses={200: {"content": {"image/jpeg": {}}}, **NOT_FOUND},
 )
-def get_overlay(scan_id: str, session: SessionDep, store: StoreDep) -> Response:
+def get_overlay(scan_id: str, session: SessionDep) -> Response:
     """The original photo with products in green and gaps in red."""
     try:
         scan = get_scan(session, scan_id)
-        image = load_pixels(store, scan.image_id)
+        image = load_pixels(session, scan.image_id)
     except NotFoundError as err:
         raise HTTPException(404, str(err)) from err
     overlay = draw_overlay(image, scan.detections, scan.gaps)

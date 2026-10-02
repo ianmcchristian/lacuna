@@ -8,6 +8,9 @@ from numpy.typing import NDArray
 
 ALLOWED_TYPES = frozenset({"image/jpeg", "image/png", "image/webp"})
 
+# stored copies are capped here; the model only sees 640 px anyway
+MAX_STORED_SIDE = 2048
+
 
 def decode_image(data: bytes) -> NDArray[np.uint8] | None:
     """Bytes to a BGR array, or None if it isn't a readable image. Applies EXIF rotation."""
@@ -20,6 +23,16 @@ def decode_image(data: bytes) -> NDArray[np.uint8] | None:
 def read_image(path: Path) -> NDArray[np.uint8] | None:
     image = cv2.imread(str(path))
     return None if image is None else np.asarray(image, dtype=np.uint8)
+
+
+def fit_within(image: NDArray[np.uint8], max_side: int) -> NDArray[np.uint8]:
+    """Shrink so the longest side is at most max_side. Never upscales."""
+    height, width = image.shape[:2]
+    scale = max_side / max(height, width)
+    if scale >= 1:
+        return image
+    size = (round(width * scale), round(height * scale))
+    return np.asarray(cv2.resize(image, size, interpolation=cv2.INTER_AREA), dtype=np.uint8)
 
 
 def encode_jpeg(image: NDArray[np.uint8], quality: int = 85) -> bytes:

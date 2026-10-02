@@ -25,7 +25,6 @@ COPY alembic.ini ./
 COPY migrations ./migrations
 ENV PATH=/app/.venv/bin:$PATH \
     PYTHONUNBUFFERED=1 \
-    LACUNA_UPLOAD_DIR=/tmp/uploads \
     PORT=8080
 USER lacuna
 EXPOSE 8080

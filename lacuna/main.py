@@ -12,7 +12,6 @@ from lacuna.api import reports, scans, system
 from lacuna.config import Settings
 from lacuna.db.session import make_engine, make_sessionmaker
 from lacuna.observability import configure_logging, observe_requests
-from lacuna.storage import LocalImageStore
 from lacuna.vision import Detector, OnnxDetector
 
 log = structlog.get_logger()
@@ -47,7 +46,6 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.state.settings = settings
     app.state.engine = engine
     app.state.sessionmaker = make_sessionmaker(engine)
-    app.state.store = LocalImageStore(settings.upload_dir)
     app.state.detector = None
 
     app.add_middleware(

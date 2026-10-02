@@ -7,10 +7,9 @@ from numpy.typing import NDArray
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from lacuna.db.models import DetectionRecord, GapRecord, ImageRecord, Scan, Shelf
-from lacuna.imaging import ALLOWED_TYPES, decode_image
+from lacuna.db.models import DetectionRecord, GapRecord, ImageBlob, ImageRecord, Scan, Shelf
+from lacuna.imaging import ALLOWED_TYPES, MAX_STORED_SIDE, decode_image, encode_jpeg, fit_within
 from lacuna.observability import GAPS_FOUND, INFERENCE_SECONDS
-from lacuna.storage import ImageStore
 from lacuna.vision import Detector, analyze_shelf
 
 
@@ -38,7 +37,6 @@ def get_or_create_shelf(session: Session, code: str) -> Shelf:
 
 def save_upload(
     session: Session,
-    store: ImageStore,
     *,
     data: bytes,
     filename: str,
@@ -54,7 +52,9 @@ def save_upload(
     if image is None:
         raise UploadRejected(422, "file is empty or not a readable image")
 
-    height, width = image.shape[:2]
+    # boxes are in the stored image's pixels, so width/height describe that copy
+    stored = fit_within(image, MAX_STORED_SIDE)
+    height, width = stored.shape[:2]
     record = ImageRecord(
         filename=filename[:255],
         content_type=content_type,
@@ -64,32 +64,27 @@ def save_upload(
         shelf=get_or_create_shelf(session, shelf_code) if shelf_code else None,
     )
     session.add(record)
-    session.flush()  # assigns the id before the file write
-    store.save(record.id, data)
+    session.flush()  # assigns the id
+    session.add(ImageBlob(image_id=record.id, data=encode_jpeg(stored, quality=90)))
     session.commit()
     return record
 
 
-def load_pixels(store: ImageStore, image_id: str) -> NDArray[np.uint8]:
-    try:
-        image = decode_image(store.load(image_id))
-    except FileNotFoundError:
-        image = None
+def load_pixels(session: Session, image_id: str) -> NDArray[np.uint8]:
+    blob = session.get(ImageBlob, image_id)
+    image = decode_image(blob.data) if blob else None
     if image is None:
-        raise NotFoundError(f"image {image_id} is missing from storage")
+        raise NotFoundError(f"image {image_id} not found")
     return image
 
 
 def run_scan(
     session: Session,
-    store: ImageStore,
     detector: Detector,
     image_id: str,
     min_gap_ratio: float,
 ) -> Scan:
-    if session.get(ImageRecord, image_id) is None:
-        raise NotFoundError(f"image {image_id} not found")
-    image = load_pixels(store, image_id)
+    image = load_pixels(session, image_id)
 
     start = time.perf_counter()
     boxes = detector.detect(image)

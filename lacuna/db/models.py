@@ -1,14 +1,15 @@
 """ORM tables.
 
 shelves 1--* images 1--* scans 1--* detections
-                               1--* gaps
+                |              1--* gaps
+                1--1 image_blobs
 """
 
 import uuid
 from datetime import UTC, datetime
 from typing import Any
 
-from sqlalchemy import DateTime, Dialect, Float, ForeignKey, Integer, String
+from sqlalchemy import DateTime, Dialect, Float, ForeignKey, Integer, LargeBinary, String
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 from sqlalchemy.types import TypeDecorator
 
@@ -64,6 +65,21 @@ class ImageRecord(Base):
     created_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow)
 
     shelf: Mapped[Shelf | None] = relationship()
+
+
+class ImageBlob(Base):
+    """Image bytes, kept apart so listing images never drags megabytes along.
+
+    In the database, not on disk, so every replica sees every upload and nothing
+    is lost when a container restarts.
+    """
+
+    __tablename__ = "image_blobs"
+
+    image_id: Mapped[str] = mapped_column(
+        ForeignKey("images.id", ondelete="CASCADE"), primary_key=True
+    )
+    data: Mapped[bytes] = mapped_column(LargeBinary)
 
 
 class Scan(Base):

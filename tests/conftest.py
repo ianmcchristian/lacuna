@@ -52,7 +52,6 @@ def image_bytes(ext: str = ".jpg", size: tuple[int, int] = (480, 640)) -> bytes:
 def settings(tmp_path: Path) -> Settings:
     return Settings(
         database_url=os.environ.get("LACUNA_TEST_DATABASE_URL", f"sqlite:///{tmp_path}/test.db"),
-        upload_dir=tmp_path / "uploads",
         model_path=tmp_path / "no-model.onnx",
         max_upload_bytes=200_000,
         log_json=False,

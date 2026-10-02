@@ -13,7 +13,6 @@ class Settings(BaseSettings):
     database_url: str = "sqlite:///./lacuna.db"
     # s over n: n missed a glare-washed can and reported a fake gap. ~74 vs ~31 ms on CPU.
     model_path: Path = Path("models/sku110k-yolo11-s640.onnx")
-    upload_dir: Path = Path("uploads")
     max_upload_bytes: int = 10 * 1024 * 1024
 
     conf_threshold: float = 0.25

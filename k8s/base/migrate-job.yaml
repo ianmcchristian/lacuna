@@ -4,7 +4,7 @@ kind: Job
 metadata:
   name: lacuna-migrate
 spec:
-  backoffLimit: 2
+  backoffLimit: 6 # retries with backoff while the database comes up
   ttlSecondsAfterFinished: 600
   template:
     spec:
