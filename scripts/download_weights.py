@@ -1,6 +1,9 @@
 """Download the SKU-110K YOLO11 ONNX weights into models/ and verify the checksum.
 
 Usage: uv run python scripts/download_weights.py [n|s]
+
+The model repo revision and file hashes are pinned here, so a changed upstream
+file fails the build instead of silently swapping the model.
 """
 
 import hashlib
@@ -9,37 +12,36 @@ from pathlib import Path
 
 import httpx
 
-REPO = "https://huggingface.co/chistopat/sku110k-yolo11-object-detector/resolve/main"
+REVISION = "ee1b8ac34eb3b68969ffa8165e50c43457fe4e35"
+REPO = f"https://huggingface.co/chistopat/sku110k-yolo11-object-detector/resolve/{REVISION}"
+SHA256 = {
+    "n": "5810269bf9687ca93b0d4e1bc91cb83ac4311cd48d91c4f6091777721ba083c5",
+    "s": "e8bc019d4241cf9486c4b6aaf50d51b652b3a0d641fce1189fbba12136794cd1",
+}
 MODELS_DIR = Path(__file__).resolve().parent.parent / "models"
 
 
-def expected_sha256(client: httpx.Client, filename: str) -> str:
-    listing = client.get(f"{REPO}/checksums.sha256").raise_for_status().text
-    for line in listing.splitlines():
-        digest, _, name = line.partition("  ")
-        if name.strip().endswith(filename):
-            return digest.strip()
-    raise SystemExit(f"no checksum listed for {filename}")
-
-
-def main(variant: str = "n") -> None:
+def main(variant: str = "s") -> None:
+    if variant not in SHA256:
+        raise SystemExit(f"variant must be one of {sorted(SHA256)}")
     filename = f"sku110k-yolo11-{variant}640.onnx"
     target = MODELS_DIR / filename
     MODELS_DIR.mkdir(exist_ok=True)
 
-    with httpx.Client(follow_redirects=True, timeout=60) as client:
-        if not target.exists():
-            print(f"downloading {filename}")
-            with client.stream("GET", f"{REPO}/weights/{filename}") as resp:
-                resp.raise_for_status()
-                with target.open("wb") as out:
-                    for chunk in resp.iter_bytes():
-                        out.write(chunk)
+    if not target.exists():
+        print(f"downloading {filename}")
+        with (
+            httpx.Client(follow_redirects=True, timeout=60) as client,
+            client.stream("GET", f"{REPO}/weights/{filename}") as resp,
+        ):
+            resp.raise_for_status()
+            with target.open("wb") as out:
+                for chunk in resp.iter_bytes():
+                    out.write(chunk)
 
-        actual = hashlib.sha256(target.read_bytes()).hexdigest()
-        if actual != expected_sha256(client, filename):
-            target.unlink()
-            raise SystemExit("checksum mismatch, file removed")
+    if hashlib.sha256(target.read_bytes()).hexdigest() != SHA256[variant]:
+        target.unlink()
+        raise SystemExit("checksum mismatch, file removed")
     print(f"ok: {target}")
 
 
