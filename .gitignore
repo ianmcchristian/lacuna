@@ -1,0 +1,21 @@
+.DS_Store
+.env
+.env.*
+!.env.example
+*.json.key
+
+# python
+__pycache__/
+*.py[cod]
+.venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# local data
+models/*.onnx
+samples/
+uploads/
+*.db
