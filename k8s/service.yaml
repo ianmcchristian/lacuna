@@ -1,0 +1,13 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: lacuna
+  labels:
+    app: lacuna
+spec:
+  selector:
+    app: lacuna
+  ports:
+    - name: http
+      port: 80
+      targetPort: http

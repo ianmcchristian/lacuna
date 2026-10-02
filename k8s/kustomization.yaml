@@ -1,0 +1,20 @@
+# Local kind cluster:
+#   kind create cluster --name lacuna
+#   docker build -t lacuna:local . && kind load docker-image lacuna:local --name lacuna
+#   kubectl create secret generic lacuna-db --from-literal=database-url='postgresql+psycopg://...'
+#   kubectl apply -k k8s/
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+labels:
+  - pairs:
+      app.kubernetes.io/name: lacuna
+resources:
+  - migrate-job.yaml
+  - deployment.yaml
+  - service.yaml
+  - hpa.yaml
+configMapGenerator:
+  - name: lacuna-config
+    literals:
+      - LACUNA_LOG_JSON=true
+      - LACUNA_MIN_GAP_RATIO=0.8
