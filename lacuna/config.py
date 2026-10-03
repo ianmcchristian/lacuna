@@ -15,6 +15,9 @@ class Settings(BaseSettings):
     model_path: Path = Path("models/sku110k-yolo11-s640.onnx")
     max_upload_bytes: int = 10 * 1024 * 1024
 
+    # ONNX Runtime threads, 0 = one per core. Use 1 on small CPU quotas (0.1 CPU: 33 s -> 7 s)
+    inference_threads: int = 0
+
     conf_threshold: float = 0.25
     iou_threshold: float = 0.45
     # a hole has to be this many median product widths wide to count as a gap

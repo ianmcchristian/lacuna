@@ -117,8 +117,16 @@ class OnnxDetector:
         conf: float = 0.25,
         iou: float = 0.45,
         max_det: int = 1000,
+        threads: int = 0,
     ) -> None:
-        self._session = ort.InferenceSession(str(model_path), providers=["CPUExecutionProvider"])
+        # 0 lets ONNX Runtime start a thread per core. Under a CPU quota smaller than
+        # the host, those threads fight each other, so cap it to the cores you get.
+        options = ort.SessionOptions()
+        options.intra_op_num_threads = threads
+        options.inter_op_num_threads = 1
+        self._session = ort.InferenceSession(
+            str(model_path), options, providers=["CPUExecutionProvider"]
+        )
         model_input = self._session.get_inputs()[0]
         self._input_name: str = model_input.name
         self._size = int(model_input.shape[2])

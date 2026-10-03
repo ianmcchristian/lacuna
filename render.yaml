@@ -12,5 +12,7 @@ services:
     envVars:
       - key: LACUNA_DATABASE_URL
         sync: false # Neon connection string, entered once in the Render dashboard
+      - key: LACUNA_INFERENCE_THREADS
+        value: "1" # free plan has 0.1 CPU; more threads just fight over it
       - key: LACUNA_CORS_ORIGINS
         value: '["https://ianmcchristian.github.io", "http://localhost:5173"]'

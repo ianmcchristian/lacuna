@@ -21,7 +21,12 @@ def load_detector(settings: Settings) -> Detector | None:
     if not settings.model_path.exists():
         log.warning("model file missing, /detect will return 503", path=str(settings.model_path))
         return None
-    detector = OnnxDetector(settings.model_path, settings.conf_threshold, settings.iou_threshold)
+    detector = OnnxDetector(
+        settings.model_path,
+        settings.conf_threshold,
+        settings.iou_threshold,
+        threads=settings.inference_threads,
+    )
     log.info("model loaded", model=detector.name)
     return detector
 
