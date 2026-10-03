@@ -111,6 +111,37 @@ button:disabled {
   cursor: progress;
 }
 
+.where {
+  margin: 0 0 1.25rem;
+  padding: 1rem 1.25rem;
+  border: 1px solid var(--muted);
+  border-radius: 8px;
+}
+
+.where legend {
+  padding: 0 0.25rem;
+  font-weight: 600;
+}
+
+.choice {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  column-gap: 0.5rem;
+  align-items: center;
+}
+
+/* WCAG 2.2 target size */
+.choice input {
+  width: 1.5rem;
+  height: 1.5rem;
+  margin: 0;
+}
+
+.choice .hint {
+  grid-column: 2;
+  margin-top: 0;
+}
+
 .samples {
   margin-top: 2rem;
 }

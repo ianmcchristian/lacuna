@@ -3,6 +3,7 @@ import userEvent from "@testing-library/user-event";
 import axe from "axe-core";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { App } from "./App";
+import * as browserScan from "./inference/browserScan";
 import type { Scan } from "./api";
 
 const scan: Scan = {
@@ -34,7 +35,18 @@ function mockApi(...responses: Array<{ status: number; body: unknown }>) {
 
 const photo = () => new File(["fake"], "shelf.jpg", { type: "image/jpeg" });
 
-afterEach(() => vi.unstubAllGlobals());
+afterEach(() => {
+  vi.unstubAllGlobals();
+  vi.restoreAllMocks();
+});
+
+// pretend this is a browser that can run the model
+function canRunInBrowser() {
+  vi.stubGlobal("OffscreenCanvas", class {});
+  vi.stubGlobal("createImageBitmap", vi.fn());
+  // jsdom has no blob URLs at all
+  Object.assign(URL, { createObjectURL: vi.fn(() => "blob:overlay"), revokeObjectURL: vi.fn() });
+}
 
 describe("App", () => {
   it("has labelled inputs and no axe violations", async () => {
@@ -49,6 +61,8 @@ describe("App", () => {
     render(<App />);
     await user.tab();
     expect(screen.getByText("Skip to content")).toHaveFocus();
+    await user.tab(); // jsdom can't run the model, so the server is the only choice
+    expect(screen.getByRole("radio", { name: "On the server" })).toHaveFocus();
     await user.tab();
     expect(screen.getByLabelText("Shelf photo")).toHaveFocus();
     await user.tab();
@@ -141,6 +155,53 @@ describe("App", () => {
     render(<App />);
     expect(screen.getAllByText("Hard case")).toHaveLength(3);
     expect(screen.getByRole("button", { name: /^Angled .* Hard case$/ })).toBeInTheDocument();
+  });
+
+  it("runs in the browser by default when it can, without the API", async () => {
+    canRunInBrowser();
+    const fetchMock = mockApi();
+    const scanSpy = vi.spyOn(browserScan, "scanInBrowser").mockResolvedValue({
+      model: "sku110k-yolo11-s640-int8",
+      product_count: 20,
+      gap_count: 1,
+      occupancy: 0.91,
+      latency_ms: 140,
+      gaps: scan.gaps,
+      overlay: new Blob(),
+    });
+    const user = userEvent.setup();
+    const { container } = render(<App />);
+
+    expect(screen.getByRole("radio", { name: "In this browser" })).toBeChecked();
+    expect(screen.queryByLabelText("Shelf code (optional)")).not.toBeInTheDocument();
+    await user.upload(screen.getByLabelText("Shelf photo"), photo());
+    await user.click(screen.getByRole("button", { name: "Scan shelf" }));
+
+    expect(await screen.findByText(/Ran in your browser/)).toBeInTheDocument();
+    expect(screen.getByRole("img")).toHaveAttribute("src", "blob:overlay");
+    expect(scanSpy).toHaveBeenCalledOnce();
+    expect(fetchMock).not.toHaveBeenCalled();
+    await expectNoA11yViolations(container);
+  });
+
+  it("suggests the server when the browser can't run the model", async () => {
+    canRunInBrowser();
+    vi.spyOn(browserScan, "scanInBrowser").mockRejectedValue(new Error("no wasm"));
+    const user = userEvent.setup();
+    render(<App />);
+    await user.upload(screen.getByLabelText("Shelf photo"), photo());
+    await user.click(screen.getByRole("button", { name: "Scan shelf" }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(/Try running it on the server/);
+  });
+
+  it("asks for a shelf code only for server scans", async () => {
+    canRunInBrowser();
+    const user = userEvent.setup();
+    render(<App />);
+    expect(screen.queryByLabelText("Shelf code (optional)")).not.toBeInTheDocument();
+    await user.click(screen.getByRole("radio", { name: "On the server" }));
+    expect(screen.getByLabelText("Shelf code (optional)")).toBeInTheDocument();
   });
 
   it("announces API errors", async () => {

@@ -1,9 +1,9 @@
 import { useEffect, useRef } from "react";
-import { Scan, overlayUrl } from "./api";
+import type { Result } from "./runScan";
 
 const percent = (value: number | null) => (value === null ? "Unknown" : `${Math.round(value * 100)}%`);
 
-function Verdict({ scan }: { scan: Scan }) {
+function Verdict({ scan }: { scan: Result }) {
   // no occupancy means no row had enough products to measure, so don't call it full
   if (scan.occupancy === null) {
     return <p>Not enough products found to check for gaps. Try a clearer photo taken straight on.</p>;
@@ -34,11 +34,19 @@ function Verdict({ scan }: { scan: Scan }) {
   );
 }
 
-export function ScanResult({ scan }: { scan: Scan }) {
+export function ScanResult({ scan }: { scan: Result }) {
   const heading = useRef<HTMLHeadingElement>(null);
 
   // move focus to the new results so keyboard and screen reader users land on them
-  useEffect(() => heading.current?.focus(), [scan.id]);
+  useEffect(() => heading.current?.focus(), [scan.key]);
+
+  // browser scans draw their overlay into a blob URL; free it when it's replaced
+  useEffect(() => {
+    const url = scan.overlay;
+    return () => {
+      if (url.startsWith("blob:")) URL.revokeObjectURL(url);
+    };
+  }, [scan.overlay]);
 
   const gapWord = scan.gap_count === 1 ? "gap" : "gaps";
   const alt = `Shelf photo with ${scan.product_count} products outlined in green and ${scan.gap_count} ${gapWord} shaded red.`;
@@ -48,6 +56,9 @@ export function ScanResult({ scan }: { scan: Scan }) {
       <h2 id="result-heading" ref={heading} tabIndex={-1}>
         Results
       </h2>
+      <p className="hint">
+        {scan.where === "browser" ? "Ran in your browser" : "Ran on the server and saved"} with {scan.model}.
+      </p>
 
       <dl className="summary">
         <div>
@@ -69,7 +80,7 @@ export function ScanResult({ scan }: { scan: Scan }) {
       </dl>
 
       <figure>
-        <img src={overlayUrl(scan.id)} alt={alt} />
+        <img src={scan.overlay} alt={alt} />
         <figcaption>Green outlines are products. Red shaded boxes are gaps.</figcaption>
       </figure>
 

@@ -3,10 +3,11 @@ import { SHELF_CODE, validateFile } from "./api";
 
 interface Props {
   busy: boolean;
+  askShelf: boolean; // shelf codes only mean something for saved (server) scans
   onScan: (file: File, shelf: string) => void;
 }
 
-export function UploadForm({ busy, onScan }: Props) {
+export function UploadForm({ busy, askShelf, onScan }: Props) {
   const [fileError, setFileError] = useState<string | null>(null);
   const [shelfError, setShelfError] = useState<string | null>(null);
   const photoInput = useRef<HTMLInputElement>(null);
@@ -57,28 +58,30 @@ export function UploadForm({ busy, onScan }: Props) {
         )}
       </div>
 
-      <div className="field">
-        <label htmlFor="shelf">Shelf code (optional)</label>
-        <p id="shelf-hint" className="hint">
-          Used to track this shelf over time, like aisle4-bay2.
-        </p>
-        <input
-          ref={shelfInput}
-          id="shelf"
-          name="shelf"
-          type="text"
-          autoComplete="off"
-          spellCheck={false}
-          onChange={() => setShelfError(null)}
-          aria-describedby={shelfError ? "shelf-hint shelf-error" : "shelf-hint"}
-          aria-invalid={shelfError ? true : undefined}
-        />
-        {shelfError && (
-          <p id="shelf-error" className="error">
-            {shelfError}
+      {askShelf && (
+        <div className="field">
+          <label htmlFor="shelf">Shelf code (optional)</label>
+          <p id="shelf-hint" className="hint">
+            Used to track this shelf over time, like aisle4-bay2.
           </p>
-        )}
-      </div>
+          <input
+            ref={shelfInput}
+            id="shelf"
+            name="shelf"
+            type="text"
+            autoComplete="off"
+            spellCheck={false}
+            onChange={() => setShelfError(null)}
+            aria-describedby={shelfError ? "shelf-hint shelf-error" : "shelf-hint"}
+            aria-invalid={shelfError ? true : undefined}
+          />
+          {shelfError && (
+            <p id="shelf-error" className="error">
+              {shelfError}
+            </p>
+          )}
+        </div>
+      )}
 
       <button type="submit" disabled={busy} aria-disabled={busy}>
         {busy ? "Scanning…" : "Scan shelf"}

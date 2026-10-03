@@ -1,26 +1,36 @@
 import { useState } from "react";
-import { ApiError, Scan, scanShelf } from "./api";
+import { ApiError } from "./api";
 import { SamplePicker } from "./SamplePicker";
 import { ScanResult } from "./ScanResult";
 import { UploadForm } from "./UploadForm";
+import { WherePicker } from "./WherePicker";
+import { Result, Where, browserSupported, runScan } from "./runScan";
 import { Sample, loadSample } from "./samples";
 
 type State =
   | { kind: "idle" }
   | { kind: "scanning"; what: string }
-  | { kind: "done"; scan: Scan }
+  | { kind: "done"; result: Result }
   | { kind: "error"; message: string };
+
+function errorMessage(err: unknown, where: Where) {
+  if (err instanceof ApiError) return err.message;
+  if (where === "browser") return "Couldn't run the model in this browser. Try running it on the server instead.";
+  return "Something went wrong. Try again.";
+}
 
 export function App() {
   const [state, setState] = useState<State>({ kind: "idle" });
+  const [where, setWhere] = useState<Where>(browserSupported() ? "browser" : "server");
+  const busy = state.kind === "scanning";
 
   async function run(what: string, getFile: () => Promise<File>, shelf = "") {
-    setState({ kind: "scanning", what });
+    const place = where === "browser" ? "in your browser" : "on the server";
+    setState({ kind: "scanning", what: `${what} ${place}` });
     try {
-      setState({ kind: "done", scan: await scanShelf(await getFile(), shelf) });
+      setState({ kind: "done", result: await runScan(where, await getFile(), shelf) });
     } catch (err) {
-      const message = err instanceof ApiError ? err.message : "Something went wrong. Try again.";
-      setState({ kind: "error", message });
+      setState({ kind: "error", message: errorMessage(err, where) });
     }
   }
 
@@ -34,14 +44,13 @@ export function App() {
         <p>Upload a shelf photo to find where product is missing.</p>
       </header>
       <main id="main">
+        <WherePicker where={where} browserOk={browserSupported()} busy={busy} onChange={setWhere} />
         <UploadForm
-          busy={state.kind === "scanning"}
+          busy={busy}
+          askShelf={where === "server"}
           onScan={(file, shelf) => run("your shelf photo", async () => file, shelf)}
         />
-        <SamplePicker
-          busy={state.kind === "scanning"}
-          onPick={(sample: Sample) => run(`the ${sample.label} sample`, () => loadSample(sample))}
-        />
+        <SamplePicker busy={busy} onPick={(sample: Sample) => run(`the ${sample.label} sample`, () => loadSample(sample))} />
 
         <p role="status" className="status">
           {state.kind === "scanning" && `Scanning ${state.what}…`}
@@ -52,7 +61,7 @@ export function App() {
           </p>
         )}
 
-        {state.kind === "done" && <ScanResult scan={state.scan} />}
+        {state.kind === "done" && <ScanResult scan={state.result} />}
       </main>
       <footer>
         <p>

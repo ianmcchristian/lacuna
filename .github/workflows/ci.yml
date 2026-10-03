@@ -26,20 +26,8 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - uses: astral-sh/setup-uv@v6
-        with:
-          enable-cache: true
-
+      - uses: ./.github/actions/int8-model
       - run: uv sync --locked
-
-      - name: Cache model weights
-        uses: actions/cache@v4
-        with:
-          path: models/*.onnx
-          key: weights-sku110k-yolo11-s640-v1
-
-      - run: uv run python scripts/download_weights.py s
-      - run: uv run python scripts/quantize.py
 
       - name: Lint
         run: |
@@ -68,12 +56,13 @@ jobs:
           node-version: 20
           cache: npm
           cache-dependency-path: web/package-lock.json
+      - uses: ./.github/actions/int8-model # the UI runs it in the browser
       - run: npm ci
       - run: npm run typecheck
       - name: Unit tests (axe in jsdom)
         run: npm test
       - run: npx playwright install --with-deps chromium
-      - name: Browser tests (axe WCAG 2.2 AA incl. contrast, keyboard flow)
+      - name: Browser tests (axe WCAG 2.2 AA, keyboard flow, browser vs Python gap parity)
         run: npm run e2e
 
   image:

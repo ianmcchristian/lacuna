@@ -40,6 +40,12 @@ test("keyboard user can scan a shelf and land on the results", async ({ page }) 
   await expect(page.getByRole("link", { name: "Skip to content" })).toBeFocused();
   await expect(page.getByRole("link", { name: "Skip to content" })).toBeInViewport();
 
+  // radio group: Tab lands on the checked option, arrows move between them
+  await page.keyboard.press("Tab");
+  await expect(page.getByRole("radio", { name: "In this browser" })).toBeFocused();
+  await page.keyboard.press("ArrowDown");
+  await expect(page.getByRole("radio", { name: "On the server" })).toBeChecked();
+
   await page.getByLabel("Shelf photo").setInputFiles(photo);
   await page.getByLabel("Shelf code (optional)").fill("aisle4-bay2");
   await page.getByLabel("Shelf code (optional)").press("Tab");
@@ -59,10 +65,11 @@ test("keyboard user can scan a shelf and land on the results", async ({ page }) 
   }
 });
 
-test("a sample shelf scans in one click", async ({ page }) => {
+test("a sample shelf scans in one click on the server", async ({ page }) => {
   await mockApi(page);
   const uploaded = page.waitForRequest("http://api.test/images");
   await page.goto("/");
+  await page.getByRole("radio", { name: "On the server" }).check();
 
   // thumbnails come from the real build, served out of docs/
   const thumb = page.locator("button.sample img").first();
@@ -80,7 +87,26 @@ test("API errors are announced", async ({ page }) => {
     route.fulfill({ status: 413, json: { detail: "file is over the 10 MB limit" } }),
   );
   await page.goto("/");
+  await page.getByRole("radio", { name: "On the server" }).check();
   await page.getByLabel("Shelf photo").setInputFiles(photo);
   await page.getByRole("button", { name: "Scan shelf" }).click();
   await expect(page.getByRole("alert")).toHaveText("file is over the 10 MB limit");
+});
+
+test("a browser scan runs the real model and never calls the API", async ({ page }) => {
+  const apiCalls: string[] = [];
+  await page.route("http://api.test/**", (route) => {
+    apiCalls.push(route.request().url());
+    return route.abort();
+  });
+  await page.goto("/");
+  await expect(page.getByRole("radio", { name: "In this browser" })).toBeChecked();
+  await expect(page.getByLabel("Shelf code (optional)")).toHaveCount(0); // server scans only
+
+  await page.getByRole("button", { name: /^Canned goods/ }).click();
+  await expect(page.getByRole("heading", { name: "Results" })).toBeFocused({ timeout: 60_000 });
+  await expect(page.getByText(/Ran in your browser with sku110k-yolo11-s640-int8/)).toBeVisible();
+  await expect(page.getByRole("img", { name: /2 gaps shaded red/ })).toBeVisible();
+  expect(apiCalls).toEqual([]);
+  await expectAccessible(page);
 });

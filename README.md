@@ -12,9 +12,10 @@ restock first.
 *lacuna (Latin): a gap, the missing piece.*
 
 **Try it:** [upload UI](https://ianmcchristian.github.io/lacuna/) ·
-[API docs](https://lacuna-mp1n.onrender.com/docs). The API runs on a free
-instance with a tenth of a CPU, so a scan takes several seconds there (about
-75 ms on a laptop).
+[API docs](https://lacuna-mp1n.onrender.com/docs). By default the UI runs the
+model in your browser, so a scan takes about half a second and the photo never
+leaves your device. The other option sends it to the API, which saves the scan
+but runs on a free instance with a tenth of a CPU, so it takes several seconds.
 
 ![Upload UI showing a scan with 40 products, 2 gaps, and 89% occupancy](docs/screenshot.jpg)
 
@@ -87,6 +88,30 @@ Getting there took two fixes:
   regression tests, so INT8 is never graded on a photo it was calibrated on.
 
 Every model test runs on both the fp32 and INT8 models in CI.
+
+## In-browser inference
+
+The UI can run the whole pipeline client-side with
+[ONNX Runtime Web](https://onnxruntime.ai/docs/tutorials/web/) (WASM). The
+10 MB INT8 model is what makes this practical: the first scan downloads about
+25 MB (model plus runtime), and that only happens when someone picks browser
+mode. The page itself is 50 KB gzipped.
+
+Letterboxing, decoding, NMS, and the gap logic are ported to TypeScript
+([`web/src/inference/`](web/src/inference/)). Two implementations of the same
+logic can drift, so a Playwright test runs the real model in Chromium on all 8
+regression shelves and checks it finds the same gaps as Python, within the same
+25 px. The gap logic's unit tests are ported too.
+
+| | Browser (Chromium, M-series Mac) | API on Render's free plan |
+|---|---|---|
+| Inference | ~550 ms | several seconds |
+| First scan | ~1.7 s (loads runtime + model) | up to a minute if the instance is asleep |
+| Photo uploaded | No | Yes, and saved with the scan |
+| Shelf history | No | Yes |
+
+Threads stay at 1: multi-threaded WASM needs cross-origin isolation headers,
+and GitHub Pages can't send them.
 
 ## How it works
 
@@ -204,6 +229,12 @@ a second app instance (a fresh replica). With the weights downloaded, they also
 run the fp32 and INT8 models on 8 shelf photos, checking every hole's row and
 position, and inpaint one bottle out of a full row to check the gap lands there.
 
+20 Vitest tests cover the UI states in jsdom (with axe) and the TypeScript gap
+logic. 13 Playwright tests run the production build in Chromium: accessibility,
+the keyboard flow, and real in-browser scans of all 8 regression shelves
+checked against the Python results. Browser e2e needs the INT8 model in
+`models/` (see Run it).
+
 CI runs all of it against Postgres 16, builds the Docker image, starts it, and
 scans a demo shelf in the container, checking it runs the INT8 model and finds
 both holes.
@@ -227,8 +258,8 @@ and gaps are listed in a table so the result doesn't rely on color. Text
 contrast is at least 6.67:1.
 
 Playwright runs axe-core with every WCAG 2.2 AA rule (color contrast
-included) in Chromium before and after a scan, and drives the whole flow by
-keyboard. Vitest runs axe again in jsdom on each component state.
+included) in Chromium before and after a scan, in both modes, and drives the
+whole flow by keyboard. Vitest runs axe again in jsdom on each component state.
 
 ## Design notes
 

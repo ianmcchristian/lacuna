@@ -1,0 +1,20 @@
+# Download the pinned weights and build the INT8 copy into models/.
+# Used by the API tests, the UI tests (browser inference), and the Pages build.
+name: INT8 model
+description: Fetch the YOLO11s weights and quantize them
+runs:
+  using: composite
+  steps:
+    - uses: astral-sh/setup-uv@v6
+      with:
+        enable-cache: true
+    - name: Cache model weights
+      uses: actions/cache@v4
+      with:
+        path: models/sku110k-yolo11-s640.onnx
+        key: weights-sku110k-yolo11-s640-v1
+    - shell: bash
+      run: |
+        uv sync --locked --no-dev --group quantize
+        uv run --no-sync python scripts/download_weights.py s
+        uv run --no-sync python scripts/quantize.py

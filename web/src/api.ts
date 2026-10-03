@@ -1,19 +1,12 @@
 // Thin client for the Lacuna API.
 
+import type { Gap } from "./inference/gaps";
+
 export const API_URL = (import.meta.env.VITE_API_URL ?? "http://localhost:8000").replace(/\/$/, "");
 
 export const ALLOWED_TYPES = ["image/jpeg", "image/png", "image/webp"];
 export const MAX_BYTES = 10 * 1024 * 1024;
 export const SHELF_CODE = /^[A-Za-z0-9._-]{1,64}$/;
-
-export interface Gap {
-  row: number;
-  x1: number;
-  y1: number;
-  x2: number;
-  y2: number;
-  width_ratio: number;
-}
 
 export interface Scan {
   id: string;

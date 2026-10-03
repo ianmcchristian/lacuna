@@ -5,7 +5,15 @@ name: pages
 on:
   push:
     branches: [main]
-    paths: ["web/**", "docs/demo/**", "docs/scenarios/**", "docs/thumbs/**", ".github/workflows/pages.yml"]
+    paths:
+      - "web/**"
+      - "docs/demo/**"
+      - "docs/scenarios/**"
+      - "docs/thumbs/**"
+      - "scripts/download_weights.py"
+      - "scripts/quantize.py"
+      - ".github/actions/int8-model/**"
+      - ".github/workflows/pages.yml"
   workflow_dispatch:
 
 permissions:
@@ -29,6 +37,7 @@ jobs:
         working-directory: web
     steps:
       - uses: actions/checkout@v4
+      - uses: ./.github/actions/int8-model # served to the browser
       - uses: actions/setup-node@v4
         with:
           node-version: 20
