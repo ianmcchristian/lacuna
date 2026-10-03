@@ -11,6 +11,11 @@ restock first.
 
 *lacuna (Latin): a gap, the missing piece.*
 
+**Try it:** [upload UI](https://ianmcchristian.github.io/lacuna/) ·
+[API docs](https://lacuna-mp1n.onrender.com/docs). The API runs on a free
+instance with a tenth of a CPU, so a scan takes several seconds there (about
+75 ms on a laptop).
+
 ![Upload UI showing a scan with 40 products, 2 gaps, and 89% occupancy](docs/screenshot.jpg)
 
 ## Demo
