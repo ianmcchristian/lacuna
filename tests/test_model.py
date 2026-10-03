@@ -1,4 +1,7 @@
-"""Real model on real-looking shelves. Skipped if the weights aren't downloaded (CI has them)."""
+"""Real models on real-looking shelves. Skipped if the weights aren't there (CI has them).
+
+Every check runs on the float model and its INT8 copy (scripts/quantize.py).
+"""
 
 from pathlib import Path
 
@@ -9,20 +12,24 @@ from numpy.typing import NDArray
 
 from lacuna.imaging import read_image
 from lacuna.vision import OnnxDetector, analyze_shelf
+from lacuna.vision.evaluate import EXPECTED_GAPS, gaps_match
 from tests.conftest import MODELS_DIR
 
-WEIGHTS = MODELS_DIR / "sku110k-yolo11-s640.onnx"
 DOCS_DIR = Path(__file__).resolve().parent.parent / "docs"
+WEIGHTS = {
+    "fp32": (MODELS_DIR / "sku110k-yolo11-s640.onnx", "run scripts/download_weights.py s"),
+    "int8": (MODELS_DIR / "sku110k-yolo11-s640-int8.onnx", "run scripts/quantize.py"),
+}
 
-pytestmark = [
-    pytest.mark.model,
-    pytest.mark.skipif(not WEIGHTS.exists(), reason="run scripts/download_weights.py s"),
-]
+pytestmark = pytest.mark.model
 
 
-@pytest.fixture(scope="module")
-def detector() -> OnnxDetector:
-    return OnnxDetector(WEIGHTS)
+@pytest.fixture(scope="module", params=sorted(WEIGHTS))
+def detector(request: pytest.FixtureRequest) -> OnnxDetector:
+    path, how = WEIGHTS[request.param]
+    if not path.exists():
+        pytest.skip(how)
+    return OnnxDetector(path)
 
 
 def photo(name: str) -> NDArray[np.uint8]:
@@ -35,37 +42,12 @@ def test_blank_image_finds_nothing(detector: OnnxDetector) -> None:
     assert detector.detect(np.full((480, 640, 3), 128, dtype=np.uint8)) == []
 
 
-# (row, x1, x2) of every hole in each photo, checked by eye against the overlays.
-# Scenarios that still fail (angled, messy, empty-row) are documented in the README.
-EXPECTED_GAPS = {
-    "demo/canned-goods": [(1, 463, 779), (3, 889, 1129)],  # 3 cans mid-row, 2 at the end
-    "demo/cereal": [(1, 17, 362), (1, 667, 808)],  # 2 boxes at the start, 1 mid-row
-    "demo/bottles": [(1, 382, 833), (2, 106, 206)],  # 4 bottles mid-row, 1 near the start
-    "scenarios/fully-stocked": [],
-    "scenarios/depleted": [
-        (0, 214, 541),
-        (0, 699, 1016),
-        (1, 219, 556),
-        (1, 743, 1057),
-        (2, 188, 549),
-        (2, 725, 1018),
-    ],
-    "scenarios/mixed-sizes": [(0, 1070, 1249), (1, 499, 712)],  # cans next to 2 L bottles
-    "scenarios/cooler-glare": [(1, 335, 527)],
-    "scenarios/low-light": [(0, 214, 458)],
-}
-
-
 @pytest.mark.parametrize("name", sorted(EXPECTED_GAPS))
 def test_finds_every_hole_and_nothing_else(detector: OnnxDetector, name: str) -> None:
     image = photo(name)
     gaps = analyze_shelf(detector.detect(image), image_height=image.shape[0]).gaps
-    found = [(g.row, g.x1, g.x2) for g in gaps]
-    assert len(found) == len(EXPECTED_GAPS[name]), found
-    for (row, x1, x2), (exp_row, exp_x1, exp_x2) in zip(found, EXPECTED_GAPS[name], strict=True):
-        assert row == exp_row
-        assert x1 == pytest.approx(exp_x1, abs=25)
-        assert x2 == pytest.approx(exp_x2, abs=25)
+    found = [(g.row, round(g.x1), round(g.x2)) for g in gaps]
+    assert gaps_match(gaps, EXPECTED_GAPS[name]), f"expected {EXPECTED_GAPS[name]}, got {found}"
 
 
 def test_inpainted_hole_is_found(detector: OnnxDetector) -> None:

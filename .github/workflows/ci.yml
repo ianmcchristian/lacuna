@@ -39,6 +39,7 @@ jobs:
           key: weights-sku110k-yolo11-s640-v1
 
       - run: uv run python scripts/download_weights.py s
+      - run: uv run python scripts/quantize.py
 
       - name: Lint
         run: |
@@ -97,12 +98,11 @@ jobs:
             -e LACUNA_DATABASE_URL=sqlite:////tmp/lacuna.db lacuna:ci \
             sh -c 'alembic upgrade head && exec uvicorn lacuna.main:create_app --factory --host 0.0.0.0 --port 8080'
           for i in $(seq 30); do curl -sf localhost:8080/ready && break; sleep 2; done
-          curl -sfL -o shelf.jpg \
-            https://huggingface.co/chistopat/sku110k-yolo11-object-detector/resolve/ee1b8ac34eb3b68969ffa8165e50c43457fe4e35/examples/drink-shelf-yolo11s-object.jpg
-          image_id=$(curl -sf -F 'file=@shelf.jpg;type=image/jpeg' localhost:8080/images | jq -r .id)
+          image_id=$(curl -sf -F 'file=@docs/demo/bottles.jpg;type=image/jpeg' localhost:8080/images | jq -r .id)
           curl -sf -X POST localhost:8080/detect -H 'content-type: application/json' \
             -d "{\"image_id\": \"$image_id\"}" | tee scan.json
-          jq -e '.product_count > 0' scan.json
+          # the image ships the INT8 model, and it should find both holes in the demo shelf
+          jq -e '.model == "sku110k-yolo11-s640-int8" and .gap_count == 2' scan.json
           docker logs lacuna | tail -5
 
   # Render deploys main once these checks pass, so the schema is always ready first

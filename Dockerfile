@@ -15,18 +15,27 @@ COPY README.md LICENSE ./
 COPY lacuna ./lacuna
 RUN uv sync --locked --no-dev --no-editable
 
+# INT8 copy of the weights, calibrated on the hard-case shelves in docs/
+FROM build AS quantize
+RUN uv sync --locked --no-dev --no-editable --group quantize
+COPY scripts/quantize.py ./scripts/
+COPY docs/scenarios ./docs/scenarios
+COPY --from=weights /models ./models
+RUN .venv/bin/python scripts/quantize.py
+
 # Runtime
 FROM python:3.12-slim
 RUN useradd --create-home --uid 1000 lacuna
 WORKDIR /app
 COPY --from=build /app/.venv /app/.venv
-COPY --from=weights /models /app/models
+COPY --from=quantize /app/models /app/models
 COPY alembic.ini ./
 COPY migrations ./migrations
 ENV PATH=/app/.venv/bin:$PATH \
     PYTHONUNBUFFERED=1 \
-    PORT=8080
+    PORT=8080 \
+    LACUNA_MODEL_PATH=models/sku110k-yolo11-s640-int8.onnx
 USER lacuna
 EXPOSE 8080
-# Cloud Run sets PORT. Access logs come from the app as JSON, so uvicorn's are off.
+# Render sets PORT. Access logs come from the app as JSON, so uvicorn's are off.
 CMD ["sh", "-c", "exec uvicorn lacuna.main:create_app --factory --host 0.0.0.0 --port ${PORT} --no-access-log"]

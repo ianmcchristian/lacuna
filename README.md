@@ -57,6 +57,37 @@ long "gap". Rows that are mostly cut off by the top or bottom of the photo
 are now skipped, which removed all five of those false gaps and changed
 nothing else. The five correct scenarios are regression tests too.
 
+## INT8 quantization
+
+The deployed model is an INT8 copy of YOLO11s made with ONNX Runtime static
+quantization ([`scripts/quantize.py`](scripts/quantize.py), built into the
+Docker image). Same 11 shelves, 1 CPU thread, M-series Mac
+([`scripts/benchmark.py`](scripts/benchmark.py)):
+
+| Model | Size | Median latency | Boxes matched (recall / precision) | Gap tests |
+|---|---|---|---|---|
+| YOLO11s fp32 (baseline) | 37.9 MB | 257 ms | 100% / 100% | 8/8 |
+| **YOLO11s INT8 (deployed)** | **10.2 MB** | **87 ms** | 99.3% / 97.3% | **8/8** |
+| YOLO11n fp32 | 10.6 MB | 92 ms | 90.3% / 91.9% | 7/8 |
+
+3x faster and 3.7x smaller than the model it came from, with the same gap
+results. It's as fast as the nano model without losing what the small model
+was picked for. With every core it's 28 ms vs 72 ms. There are no hand-labelled
+boxes, so "boxes matched" is agreement with the fp32 model at IoU 0.5.
+
+Getting there took two fixes:
+
+- **The first INT8 model found nothing.** YOLO's last layer concatenates box
+  coordinates (0-640 px) and scores (0-1) into one tensor. One INT8 scale over
+  both rounds every score to zero. Keeping that decode step in float fixed it.
+- **Calibration data mattered more than the method.** Calibrating on the 3 demo
+  shelves passed 5-7 of 8 gap tests. In canned-goods it saw a product in the
+  middle of a 3-can hole. Calibrating on the 3 hard-case shelves passed 8 of 8
+  with every method tried (MinMax, percentile, entropy). Those 3 aren't
+  regression tests, so INT8 is never graded on a photo it was calibrated on.
+
+Every model test runs on both the fp32 and INT8 models in CI.
+
 ## How it works
 
 ```
@@ -111,6 +142,7 @@ Needs Python 3.12 and [uv](https://docs.astral.sh/uv/).
 ```bash
 uv sync
 uv run python scripts/download_weights.py s      # ~38 MB, pinned revision + sha256
+uv run python scripts/quantize.py                # optional: the INT8 copy the image uses
 uv run alembic upgrade head                      # SQLite by default
 uv run uvicorn lacuna.main:create_app --factory --reload
 ```
@@ -165,15 +197,16 @@ uv run ruff check . && uv run mypy lacuna tests scripts
 cd web && npm test && npm run e2e               # UI: jsdom + real browser
 ```
 
-50 Python tests (97% coverage) cover the API contract, upload edge cases (wrong
+63 Python tests (97% coverage) cover the API contract, upload edge cases (wrong
 type, too big, empty, corrupt), the gap logic, pre/post-processing, the SQL
 reports, Alembic migrations matching the models, and an upload being scanned by
 a second app instance (a fresh replica). With the weights downloaded, they also
-run the real model on 8 shelf photos, checking every hole's row and position,
-and inpaint one bottle out of a full row to check the gap lands there.
+run the fp32 and INT8 models on 8 shelf photos, checking every hole's row and
+position, and inpaint one bottle out of a full row to check the gap lands there.
 
 CI runs all of it against Postgres 16, builds the Docker image, starts it, and
-runs a real detection against the container.
+scans a demo shelf in the container, checking it runs the INT8 model and finds
+both holes.
 
 ## Deployment
 
@@ -204,8 +237,7 @@ keyboard. Vitest runs axe again in jsdom on each component state.
   uses about 260 MB of RAM.
 - **YOLO11s over YOLO11n.** On a glass-door cooler photo, n missed a can
   washed out by glare (score 0.15) and reported a fake gap. s caught it (0.33)
-  and found 20 products to n's 15. It costs ~75 ms vs ~31 ms per image on CPU
-  (p50 74.6 ms, p95 79.7 ms on an M-series Mac).
+  and found 20 products to n's 15. INT8 then made s as fast as n (above).
 - **Image bytes live in Postgres**, not on disk. With two replicas behind a
   Service, an upload can land on one pod and `/detect` on another, and free
   hosts wipe their disk on restart. Stored copies are capped at 2048 px; the

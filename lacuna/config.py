@@ -11,7 +11,8 @@ class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_prefix="LACUNA_", env_file=".env", extra="ignore")
 
     database_url: str = "sqlite:///./lacuna.db"
-    # s over n: n missed a glare-washed can and reported a fake gap. ~74 vs ~31 ms on CPU.
+    # s over n: n missed a glare-washed can and reported a fake gap. The Docker image
+    # defaults to the INT8 copy of s instead: as fast as n, as accurate as s (README).
     model_path: Path = Path("models/sku110k-yolo11-s640.onnx")
     max_upload_bytes: int = 10 * 1024 * 1024
 
