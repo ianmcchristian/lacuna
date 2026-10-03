@@ -59,6 +59,22 @@ test("keyboard user can scan a shelf and land on the results", async ({ page }) 
   }
 });
 
+test("a sample shelf scans in one click", async ({ page }) => {
+  await mockApi(page);
+  const uploaded = page.waitForRequest("http://api.test/images");
+  await page.goto("/");
+
+  // thumbnails come from the real build, served out of docs/
+  const thumb = page.locator("button.sample img").first();
+  await expect(thumb).toHaveJSProperty("complete", true);
+  expect(await thumb.evaluate((img: HTMLImageElement) => img.naturalWidth)).toBe(320);
+
+  await page.getByRole("button", { name: /^Canned goods/ }).click();
+  expect((await uploaded).postDataBuffer()?.includes(Buffer.from("canned-goods.jpg"))).toBe(true);
+  await expect(page.getByRole("heading", { name: "Results" })).toBeFocused();
+  await expectAccessible(page);
+});
+
 test("API errors are announced", async ({ page }) => {
   await page.route("http://api.test/images", (route) =>
     route.fulfill({ status: 413, json: { detail: "file is over the 10 MB limit" } }),

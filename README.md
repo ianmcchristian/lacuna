@@ -37,8 +37,8 @@ images are a regression test in CI (`tests/test_model.py`).
 ### Harder scenarios
 
 Eight more AI-generated shelves, each made to test one thing. Five work, three
-don't, and the misses are kept here on purpose. Download any of them from
-[`docs/scenarios/`](docs/scenarios) and try them in the live UI.
+don't, and the misses are kept here on purpose. All 11 photos are one click
+away in the live UI under "Or try a sample shelf", with the failures marked.
 
 | Scenario | Result | |
 |---|---|---|

@@ -111,6 +111,68 @@ button:disabled {
   cursor: progress;
 }
 
+.samples {
+  margin-top: 2rem;
+}
+
+.sample-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(9.5rem, 1fr));
+  gap: 0.75rem;
+  padding: 0;
+  list-style: none;
+}
+
+.sample-grid li {
+  display: flex;
+}
+
+/* a card, not the solid accent button */
+button.sample {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.25rem;
+  width: 100%;
+  padding: 0.5rem;
+  text-align: left;
+  font-weight: 400;
+  color: var(--text);
+  background: var(--bg);
+  border: 1px solid var(--muted);
+  border-radius: 6px;
+}
+
+button.sample:hover:not(:disabled) {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 1px var(--accent);
+}
+
+.sample img {
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  object-fit: cover;
+  border-radius: 4px;
+}
+
+.sample-label {
+  font-weight: 600;
+}
+
+.sample-note {
+  font-size: 0.875rem;
+  color: var(--muted);
+}
+
+.badge {
+  padding: 0 0.4rem;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--error);
+  border: 1px solid var(--error);
+  border-radius: 999px;
+}
+
 .error {
   color: var(--error);
   font-weight: 600;

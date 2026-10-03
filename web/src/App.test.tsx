@@ -119,6 +119,30 @@ describe("App", () => {
     await expectNoA11yViolations(container);
   });
 
+  it("scans a sample shelf in one click", async () => {
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(new Response("jpeg bytes", { status: 200 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ id: "img1" }), { status: 201 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify(scan), { status: 201 }));
+    vi.stubGlobal("fetch", fetchMock);
+    const user = userEvent.setup();
+    const { container } = render(<App />);
+
+    await user.click(screen.getByRole("button", { name: /^Depleted 6 holes/ }));
+
+    expect(await screen.findByRole("heading", { name: "Results" })).toBeInTheDocument();
+    expect(fetchMock.mock.calls[0][0]).toMatch(/samples\/depleted\.jpg$/);
+    const upload = fetchMock.mock.calls[1][1].body as FormData;
+    expect((upload.get("file") as File).name).toBe("depleted.jpg");
+    await expectNoA11yViolations(container);
+  });
+
+  it("marks the known failures", () => {
+    render(<App />);
+    expect(screen.getAllByText("Hard case")).toHaveLength(3);
+    expect(screen.getByRole("button", { name: /^Angled .* Hard case$/ })).toBeInTheDocument();
+  });
+
   it("announces API errors", async () => {
     mockApi({ status: 413, body: { detail: "file is over the 10 MB limit" } });
     const user = userEvent.setup();
