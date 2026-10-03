@@ -10,6 +10,11 @@ const expected: Record<string, { gaps: Array<[number, number, number]> }> = JSON
 );
 const TOLERANCE = 25;
 
+// Row numbers count every row, even one-box rows that are skipped for gaps. A stray
+// low-score box (JPEG decode and resize differ a little across platforms) can add
+// one and shift the numbering, so compare row order, not raw numbers.
+const rank = (rows: number[]) => rows.map((r) => [...new Set(rows)].sort((a, b) => a - b).indexOf(r));
+
 for (const [name, { gaps }] of Object.entries(expected)) {
   test(`browser finds the same gaps as Python: ${name}`, async ({ page }) => {
     await page.goto("/");
@@ -23,12 +28,13 @@ for (const [name, { gaps }] of Object.entries(expected)) {
       .locator("tbody tr")
       .evaluateAll((trs) => trs.map((tr) => [...tr.querySelectorAll("td")].map((td) => Number(td.textContent))));
     const found = rows.map(([row, x1, x2]) => [row - 1, x1, x2]);
+    const why = `found ${JSON.stringify(found)}`;
 
-    expect(found.length, JSON.stringify(found)).toBe(gaps.length);
-    gaps.forEach(([row, x1, x2], i) => {
-      expect(found[i][0]).toBe(row);
-      expect(Math.abs(found[i][1] - x1), `gap ${i} start`).toBeLessThanOrEqual(TOLERANCE);
-      expect(Math.abs(found[i][2] - x2), `gap ${i} end`).toBeLessThanOrEqual(TOLERANCE);
+    expect(found.length, why).toBe(gaps.length);
+    expect(rank(found.map((g) => g[0])), why).toEqual(rank(gaps.map((g) => g[0])));
+    gaps.forEach(([, x1, x2], i) => {
+      expect(Math.abs(found[i][1] - x1), `gap ${i} start, ${why}`).toBeLessThanOrEqual(TOLERANCE);
+      expect(Math.abs(found[i][2] - x2), `gap ${i} end, ${why}`).toBeLessThanOrEqual(TOLERANCE);
     });
   });
 }
