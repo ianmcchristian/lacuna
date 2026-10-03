@@ -242,7 +242,9 @@ both holes.
 ## Deployment
 
 - **API:** Docker image on [Render](https://render.com)'s free plan
-  ([`render.yaml`](render.yaml)). Render deploys `main` only after CI passes.
+  ([`render.yaml`](render.yaml)). Once every check passes and the migration
+  runs, CI triggers a deploy hook and waits until `/health` reports the new
+  commit, so a deploy that never lands fails the build.
   The free plan sleeps after 15 minutes idle, so a scheduled workflow pings it.
 - **Database:** Postgres on [Neon](https://neon.tech). CI runs the Alembic
   migration before each deploy.

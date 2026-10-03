@@ -116,3 +116,26 @@ jobs:
       - run: uv sync --locked --no-dev
       - name: Migrate Neon
         run: uv run --no-dev alembic upgrade head
+
+  # Deploys through a Render deploy hook, then waits until prod says it's running
+  # this commit. A deploy that never lands fails here instead of going unnoticed.
+  deploy:
+    needs: migrate
+    runs-on: ubuntu-latest
+    concurrency:
+      group: deploy
+      cancel-in-progress: true # a newer push deploys a newer commit anyway
+    env:
+      HOOK: ${{ secrets.RENDER_DEPLOY_HOOK_URL }}
+      API: https://lacuna-mp1n.onrender.com
+    steps:
+      - name: Trigger Render deploy
+        run: |
+          if [ -z "$HOOK" ]; then echo "::warning::RENDER_DEPLOY_HOOK_URL not set, skipping deploy"; exit 0; fi
+          curl -sf -X POST "$HOOK" > /dev/null
+      - name: Wait for prod to run this commit
+        if: env.HOOK != ''
+        timeout-minutes: 20
+        run: |
+          until [ "$(curl -s --max-time 60 "$API/health" | jq -r .commit)" = "$GITHUB_SHA" ]; do sleep 20; done
+          curl -s "$API/health"

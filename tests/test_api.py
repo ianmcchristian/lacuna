@@ -2,6 +2,7 @@
 
 from collections.abc import Callable
 
+import pytest
 from fastapi.testclient import TestClient
 
 from lacuna.api.deps import get_detector
@@ -15,6 +16,14 @@ def test_health(client: TestClient) -> None:
     assert resp.status_code == 200
     assert resp.json()["status"] == "ok"
     assert "x-request-id" in resp.headers
+
+
+def test_health_reports_the_deployed_commit(
+    client: TestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    assert client.get("/health").json()["commit"] is None  # not on Render
+    monkeypatch.setenv("RENDER_GIT_COMMIT", "f0db0cf")
+    assert client.get("/health").json()["commit"] == "f0db0cf"
 
 
 def test_ready_without_model_is_503(client: TestClient) -> None:

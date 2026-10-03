@@ -1,5 +1,7 @@
 """Liveness, readiness, and metrics."""
 
+import os
+
 from fastapi import APIRouter, Request, Response
 from fastapi.responses import JSONResponse
 from prometheus_client import CONTENT_TYPE_LATEST, generate_latest
@@ -16,7 +18,8 @@ router = APIRouter(tags=["system"])
 @router.get("/health")
 def health() -> Health:
     """Liveness. The process is up."""
-    return Health(status="ok", version=__version__)
+    # Render sets RENDER_GIT_COMMIT on every deploy
+    return Health(status="ok", version=__version__, commit=os.environ.get("RENDER_GIT_COMMIT"))
 
 
 @router.get("/ready", responses={503: {"model": Ready}})

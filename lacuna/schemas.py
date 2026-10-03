@@ -10,6 +10,7 @@ SHELF_CODE = r"^[A-Za-z0-9._-]{1,64}$"
 class Health(BaseModel):
     status: str
     version: str
+    commit: str | None = None  # git SHA of the deploy, so CI can tell when a new one is live
 
 
 class Ready(BaseModel):

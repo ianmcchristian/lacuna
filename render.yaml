@@ -1,5 +1,6 @@
 # Render blueprint for the public API. Free plan: 512 MB RAM, sleeps after 15 min idle.
-# Render deploys main only after the GitHub checks (and the Neon migration in CI) pass.
+# CI deploys through a deploy hook once every check and the Neon migration pass,
+# then waits for /health to report the new commit. Render's own auto-deploy is off.
 services:
   - type: web
     name: lacuna
@@ -7,7 +8,7 @@ services:
     plan: free
     region: virginia # same AWS region as the Neon database
     branch: main
-    autoDeployTrigger: checksPass
+    autoDeployTrigger: "off"
     healthCheckPath: /health
     envVars:
       - key: LACUNA_DATABASE_URL
