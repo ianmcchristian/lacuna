@@ -31,7 +31,7 @@ def main() -> None:
     start = time.perf_counter()
     boxes = detector.detect(image)
     elapsed_ms = (time.perf_counter() - start) * 1000
-    result = analyze_shelf(boxes, args.min_gap_ratio)
+    result = analyze_shelf(boxes, args.min_gap_ratio, image_height=image.shape[0])
 
     out_path = args.image.with_name(f"{args.image.stem}.overlay.jpg")
     cv2.imwrite(str(out_path), draw_overlay(image, boxes, result.gaps))

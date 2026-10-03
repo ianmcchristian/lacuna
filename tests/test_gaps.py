@@ -52,6 +52,21 @@ def test_threshold_is_configurable() -> None:
     assert len(analyze_shelf(shelf_row(0, xs), min_gap_ratio=1.2).gaps) == 1
 
 
+def test_row_cut_off_by_the_frame_is_skipped() -> None:
+    # a sliver of the next shelf down, clipped by the bottom of a 400 px photo
+    sliver = [Box(x, 380, x + 50, 400) for x in (0, 60, 500, 560)]
+    boxes = [*shelf_row(50, FULL_ROW), *sliver]
+    assert len(analyze_shelf(boxes).gaps) == 1  # without the height, it looks like a hole
+    result = analyze_shelf(boxes, image_height=400)
+    assert result.gaps == []
+    assert result.occupancy == 1.0
+
+
+def test_row_near_but_inside_the_frame_still_counts() -> None:
+    boxes = shelf_row(10, GAPPY_ROW) + shelf_row(250, FULL_ROW)  # 10 px from the top and bottom
+    assert len(analyze_shelf(boxes, image_height=380).gaps) == 1
+
+
 def test_lone_box_rows_are_skipped() -> None:
     boxes = [*shelf_row(0, FULL_ROW), Box(500, 300, 550, 420)]
     result = analyze_shelf(boxes)

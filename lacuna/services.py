@@ -91,7 +91,7 @@ def run_scan(
     elapsed = time.perf_counter() - start
     INFERENCE_SECONDS.observe(elapsed)
 
-    result = analyze_shelf(boxes, min_gap_ratio)
+    result = analyze_shelf(boxes, min_gap_ratio, image_height=image.shape[0])
     GAPS_FOUND.inc(len(result.gaps))
 
     scan = Scan(

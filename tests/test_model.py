@@ -12,7 +12,7 @@ from lacuna.vision import OnnxDetector, analyze_shelf
 from tests.conftest import MODELS_DIR
 
 WEIGHTS = MODELS_DIR / "sku110k-yolo11-s640.onnx"
-DEMO_DIR = Path(__file__).resolve().parent.parent / "docs" / "demo"
+DOCS_DIR = Path(__file__).resolve().parent.parent / "docs"
 
 pytestmark = [
     pytest.mark.model,
@@ -25,8 +25,8 @@ def detector() -> OnnxDetector:
     return OnnxDetector(WEIGHTS)
 
 
-def demo(name: str) -> NDArray[np.uint8]:
-    image = read_image(DEMO_DIR / f"{name}.jpg")
+def photo(name: str) -> NDArray[np.uint8]:
+    image = read_image(DOCS_DIR / f"{name}.jpg")
     assert image is not None
     return image
 
@@ -35,20 +35,34 @@ def test_blank_image_finds_nothing(detector: OnnxDetector) -> None:
     assert detector.detect(np.full((480, 640, 3), 128, dtype=np.uint8)) == []
 
 
-# (row, x1, x2) of every hole in each demo photo, checked by eye against the overlays
-DEMO_GAPS = {
-    "canned-goods": [(1, 463, 779), (3, 889, 1129)],  # 3 cans mid-row, 2 cans at the end
-    "cereal": [(1, 17, 362), (1, 667, 808)],  # 2 boxes at the start, 1 box mid-row
-    "bottles": [(1, 382, 833), (2, 106, 206)],  # 4 bottles mid-row, 1 bottle near the start
+# (row, x1, x2) of every hole in each photo, checked by eye against the overlays.
+# Scenarios that still fail (angled, messy, empty-row) are documented in the README.
+EXPECTED_GAPS = {
+    "demo/canned-goods": [(1, 463, 779), (3, 889, 1129)],  # 3 cans mid-row, 2 at the end
+    "demo/cereal": [(1, 17, 362), (1, 667, 808)],  # 2 boxes at the start, 1 mid-row
+    "demo/bottles": [(1, 382, 833), (2, 106, 206)],  # 4 bottles mid-row, 1 near the start
+    "scenarios/fully-stocked": [],
+    "scenarios/depleted": [
+        (0, 214, 541),
+        (0, 699, 1016),
+        (1, 219, 556),
+        (1, 743, 1057),
+        (2, 188, 549),
+        (2, 725, 1018),
+    ],
+    "scenarios/mixed-sizes": [(0, 1070, 1249), (1, 499, 712)],  # cans next to 2 L bottles
+    "scenarios/cooler-glare": [(1, 335, 527)],
+    "scenarios/low-light": [(0, 214, 458)],
 }
 
 
-@pytest.mark.parametrize("name", sorted(DEMO_GAPS))
-def test_demo_shelves_find_every_hole_and_nothing_else(detector: OnnxDetector, name: str) -> None:
-    gaps = analyze_shelf(detector.detect(demo(name))).gaps
+@pytest.mark.parametrize("name", sorted(EXPECTED_GAPS))
+def test_finds_every_hole_and_nothing_else(detector: OnnxDetector, name: str) -> None:
+    image = photo(name)
+    gaps = analyze_shelf(detector.detect(image), image_height=image.shape[0]).gaps
     found = [(g.row, g.x1, g.x2) for g in gaps]
-    assert len(found) == len(DEMO_GAPS[name]), found
-    for (row, x1, x2), (exp_row, exp_x1, exp_x2) in zip(found, DEMO_GAPS[name], strict=True):
+    assert len(found) == len(EXPECTED_GAPS[name]), found
+    for (row, x1, x2), (exp_row, exp_x1, exp_x2) in zip(found, EXPECTED_GAPS[name], strict=True):
         assert row == exp_row
         assert x1 == pytest.approx(exp_x1, abs=25)
         assert x2 == pytest.approx(exp_x2, abs=25)
@@ -60,7 +74,7 @@ def test_inpainted_hole_is_found(detector: OnnxDetector) -> None:
     Inpainting, not a solid fill: a flat dark rectangle the size of a can
     still looks like a can to the model.
     """
-    image = demo("bottles")
+    image = photo("demo/bottles")
     before = analyze_shelf(detector.detect(image))
     assert not [g for g in before.gaps if g.row == 0]  # top row starts full
     top = before.rows[0]

@@ -34,6 +34,29 @@ wide (0.93x and 1.24x the median product width), which is why the threshold is
 0.8x and not something looser like 1.5x: at 1.5x only 4 of 6 are found. These
 images are a regression test in CI (`tests/test_model.py`).
 
+### Harder scenarios
+
+Eight more AI-generated shelves, each made to test one thing. Five work, three
+don't, and the misses are kept here on purpose. Download any of them from
+[`docs/scenarios/`](docs/scenarios) and try them in the live UI.
+
+| Scenario | Result | |
+|---|---|---|
+| [Fully stocked](docs/scenarios/fully-stocked.overlay.jpg) | 42 products, **0 gaps** | Correct. No false alarms on a full shelf |
+| [Depleted](docs/scenarios/depleted.overlay.jpg) | **6/6 gaps**, 48% occupancy | Correct |
+| [Mixed sizes](docs/scenarios/mixed-sizes.overlay.jpg) | **2/2 gaps** | Correct. 12 oz cans and 2 L bottles stay in one row |
+| [Cooler glare](docs/scenarios/cooler-glare.overlay.jpg) | **1/1 gap** | Correct. Bottles washed out by glare still detected |
+| [Low light](docs/scenarios/low-light.overlay.jpg) | **1/1 gap** | Correct |
+| [Messy](docs/scenarios/messy.overlay.jpg) | 1/1 gap, **1 false** | Boxes knocked onto their side aren't detected, so they read as a hole |
+| [Empty row](docs/scenarios/empty-row.overlay.jpg) | 0/1, **2 false** | A fully empty shelf has no products to anchor it. The model also splits some tall cereal boxes into a top and bottom half |
+| [Angled](docs/scenarios/angled.overlay.jpg) | 1/1 gap, **3 false** | Shelves slant in perspective, so rows can't be grouped by height |
+
+The first run of these found a bug: three photos had a sliver of the next
+shelf cut off by the bottom of the frame, and that sliver came back as one
+long "gap". Rows that are mostly cut off by the top or bottom of the photo
+are now skipped, which removed all five of those false gaps and changed
+nothing else. The five correct scenarios are regression tests too.
+
 ## How it works
 
 ```
@@ -142,12 +165,12 @@ uv run ruff check . && uv run mypy lacuna tests scripts
 cd web && npm test && npm run e2e               # UI: jsdom + real browser
 ```
 
-43 Python tests (97% coverage) cover the API contract, upload edge cases (wrong
+50 Python tests (97% coverage) cover the API contract, upload edge cases (wrong
 type, too big, empty, corrupt), the gap logic, pre/post-processing, the SQL
 reports, Alembic migrations matching the models, and an upload being scanned by
 a second app instance (a fresh replica). With the weights downloaded, they also
-run the real model on the demo shelves and inpaint one bottle out of a full row
-to check the gap lands there.
+run the real model on 8 shelf photos, checking every hole's row and position,
+and inpaint one bottle out of a full row to check the gap lands there.
 
 CI runs all of it against Postgres 16, builds the Docker image, starts it, and
 runs a real detection against the container.
@@ -193,11 +216,15 @@ keyboard. Vitest runs axe again in jsdom on each component state.
 ## Limits
 
 - A shelf row with no products at all has nothing to anchor it, so it isn't
-  reported. Rows with only one product are skipped as noise.
+  reported. Rows with only one product are skipped as noise, and so are rows
+  cut off by the edge of the photo.
+- Take the photo straight on. At a steep angle the shelves slant and rows
+  can't be grouped (see the angled scenario).
+- Products the model misses, like boxes knocked onto their side, read as
+  holes.
 - It finds *where* product is missing, not *which* product. Naming the missing
   item would need a product catalog or planogram.
-- The demo set is small and synthetic. Real store photos (angles, glare,
-  pegboard displays) will be harder.
+- The test photos are synthetic. Real store photos will be harder.
 - Small products in very large photos lose detail at 640x640.
 
 ## Credits and license

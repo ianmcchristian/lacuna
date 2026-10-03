@@ -9,8 +9,13 @@
    the edge still counts.
 3. Occupancy = 1 - gap width / shelf width, over every row we could check.
 
+Skipped rows: fewer than min_row_size products (noise), or mostly cut off
+by the top or bottom of the photo. A shelf you can only half see has no
+reliable holes; without this, a sliver of the next shelf down shows up
+as one long gap.
+
 Limits: a row with no products at all has nothing to detect, so it won't
-show up. Rows with fewer than min_row_size products are skipped as noise.
+show up.
 """
 
 from dataclasses import dataclass
@@ -19,6 +24,7 @@ from statistics import median
 from lacuna.vision.types import Box
 
 DEFAULT_MIN_GAP_RATIO = 0.8
+EDGE_MARGIN = 0.01  # a box this close to the top or bottom of the frame is cut off
 
 
 @dataclass(frozen=True, slots=True)
@@ -79,10 +85,23 @@ def row_gaps(
     return gaps
 
 
+def is_cut_off(row: list[Box], image_height: float) -> bool:
+    """True if most of the row runs off the top or bottom of the photo."""
+    margin = EDGE_MARGIN * image_height
+    clipped = sum(b.y1 <= margin or b.y2 >= image_height - margin for b in row)
+    return clipped > len(row) / 2
+
+
 def analyze_shelf(
-    boxes: list[Box], min_gap_ratio: float = DEFAULT_MIN_GAP_RATIO, min_row_size: int = 2
+    boxes: list[Box],
+    min_gap_ratio: float = DEFAULT_MIN_GAP_RATIO,
+    min_row_size: int = 2,
+    image_height: float | None = None,
 ) -> ShelfAnalysis:
-    """Rows, gaps, and an occupancy estimate for one shelf photo."""
+    """Rows, gaps, and an occupancy estimate for one shelf photo.
+
+    Pass image_height to skip rows cut off by the frame.
+    """
     if not boxes:
         return ShelfAnalysis(rows=[], gaps=[], occupancy=None)
 
@@ -94,6 +113,8 @@ def analyze_shelf(
     checked_rows = 0
     for index, row in enumerate(rows):
         if len(row) < min_row_size:
+            continue
+        if image_height is not None and is_cut_off(row, image_height):
             continue
         checked_rows += 1
         gaps.extend(row_gaps(row, index, left, right, min_gap_ratio))
