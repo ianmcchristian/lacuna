@@ -17,7 +17,6 @@ from lacuna.main import create_app
 from lacuna.vision import Box
 
 MODELS_DIR = Path(__file__).resolve().parent.parent / "models"
-SAMPLES_DIR = Path(__file__).resolve().parent.parent / "samples"
 
 
 def shelf_row(y: float, xs: Sequence[float], width: float = 50, height: float = 120) -> list[Box]:

@@ -65,9 +65,11 @@ jobs:
           cache-dependency-path: web/package-lock.json
       - run: npm ci
       - run: npm run typecheck
-      - name: Test (includes axe accessibility checks)
+      - name: Unit tests (axe in jsdom)
         run: npm test
-      - run: npm run build
+      - run: npx playwright install --with-deps chromium
+      - name: Browser tests (axe WCAG 2.2 AA incl. contrast, keyboard flow)
+        run: npm run e2e
 
   image:
     needs: test
