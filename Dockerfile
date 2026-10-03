@@ -17,7 +17,7 @@ RUN uv sync --locked --no-dev --no-editable
 
 # INT8 copy of the weights, calibrated on the hard-case shelves in docs/
 FROM build AS quantize
-RUN uv sync --locked --no-dev --no-editable --group quantize
+RUN uv sync --locked --no-dev --no-editable --group model
 COPY scripts/quantize.py ./scripts/
 COPY docs/scenarios ./docs/scenarios
 COPY --from=weights /models ./models

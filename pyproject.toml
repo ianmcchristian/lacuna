@@ -30,15 +30,15 @@ packages = ["lacuna"]
 
 [dependency-groups]
 dev = [
-    { include-group = "quantize" },
+    { include-group = "model" },
     "httpx>=0.27",
     "mypy>=1.13",
     "pytest>=8.3",
     "pytest-cov>=6.0",
     "ruff>=0.8",
 ]
-# scripts/quantize.py only; the service just needs onnxruntime
-quantize = ["onnx>=1.23.1"]
+# scripts/download_weights.py and scripts/quantize.py; the service just needs onnxruntime
+model = ["httpx>=0.27", "onnx>=1.23.1"]
 
 [tool.ruff]
 line-length = 100

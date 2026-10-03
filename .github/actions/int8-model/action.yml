@@ -15,6 +15,6 @@ runs:
         key: weights-sku110k-yolo11-s640-v1
     - shell: bash
       run: |
-        uv sync --locked --no-dev --group quantize
+        uv sync --locked --no-dev --group model
         uv run --no-sync python scripts/download_weights.py s
         uv run --no-sync python scripts/quantize.py
