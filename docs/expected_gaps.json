@@ -1,0 +1,10 @@
+{
+  "demo/canned-goods": {"note": "3 cans mid-row, 2 at the end", "gaps": [[1, 463, 779], [3, 889, 1129]]},
+  "demo/cereal": {"note": "2 boxes at the start, 1 mid-row", "gaps": [[1, 17, 362], [1, 667, 808]]},
+  "demo/bottles": {"note": "4 bottles mid-row, 1 near the start", "gaps": [[1, 382, 833], [2, 106, 206]]},
+  "scenarios/fully-stocked": {"note": "nothing missing", "gaps": []},
+  "scenarios/depleted": {"note": "2 wide holes in each of 3 rows", "gaps": [[0, 214, 541], [0, 699, 1016], [1, 219, 556], [1, 743, 1057], [2, 188, 549], [2, 725, 1018]]},
+  "scenarios/mixed-sizes": {"note": "cans next to 2 L bottles", "gaps": [[0, 1070, 1249], [1, 499, 712]]},
+  "scenarios/cooler-glare": {"note": "bottles behind glare", "gaps": [[1, 335, 527]]},
+  "scenarios/low-light": {"note": "dim, grainy photo", "gaps": [[0, 214, 458]]}
+}

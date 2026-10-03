@@ -52,6 +52,10 @@ jobs:
       - name: Test (Postgres)
         run: uv run pytest --cov --cov-report=term-missing
 
+      # x86 numbers, closer to Render than a laptop. Shows up in the run summary.
+      - name: Benchmark fp32 vs INT8
+        run: uv run python scripts/benchmark.py --runs 2 | tee -a "$GITHUB_STEP_SUMMARY"
+
   web:
     runs-on: ubuntu-latest
     defaults:

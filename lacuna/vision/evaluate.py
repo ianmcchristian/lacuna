@@ -1,8 +1,12 @@
 """Score a detector against the hand-checked test shelves.
 
 Shared by tests/test_model.py and scripts/benchmark.py so both grade the same way.
+Only works from a repo checkout: the photos and expected gaps live in docs/.
 Photo names are paths under docs/ without the .jpg.
 """
+
+import json
+from pathlib import Path
 
 from lacuna.vision.gaps import Gap
 from lacuna.vision.types import Box
@@ -10,25 +14,20 @@ from lacuna.vision.types import Box
 GAP_TOLERANCE_PX = 25
 
 # (row, x1, x2) of every hole in each photo, checked by eye against the overlays.
-# The hard cases (angled, messy, empty-row) still fail and are left out on purpose;
-# they're the INT8 calibration set instead (scripts/quantize.py).
-EXPECTED_GAPS: dict[str, list[tuple[int, float, float]]] = {
-    "demo/canned-goods": [(1, 463, 779), (3, 889, 1129)],  # 3 cans mid-row, 2 at the end
-    "demo/cereal": [(1, 17, 362), (1, 667, 808)],  # 2 boxes at the start, 1 mid-row
-    "demo/bottles": [(1, 382, 833), (2, 106, 206)],  # 4 bottles mid-row, 1 near the start
-    "scenarios/fully-stocked": [],
-    "scenarios/depleted": [
-        (0, 214, 541),
-        (0, 699, 1016),
-        (1, 219, 556),
-        (1, 743, 1057),
-        (2, 188, 549),
-        (2, 725, 1018),
-    ],
-    "scenarios/mixed-sizes": [(0, 1070, 1249), (1, 499, 712)],  # cans next to 2 L bottles
-    "scenarios/cooler-glare": [(1, 335, 527)],
-    "scenarios/low-light": [(0, 214, 458)],
-}
+# JSON so the browser parity test in web/e2e reads the same file. The hard cases
+# (angled, messy, empty-row) still fail and are left out on purpose; they're the
+# INT8 calibration set instead (scripts/quantize.py).
+EXPECTED_GAPS_FILE = Path(__file__).resolve().parents[2] / "docs" / "expected_gaps.json"
+
+
+def load_expected_gaps(
+    path: Path = EXPECTED_GAPS_FILE,
+) -> dict[str, list[tuple[int, float, float]]]:
+    data = json.loads(path.read_text())
+    return {
+        name: [(int(r), float(a), float(b)) for r, a, b in v["gaps"]] for name, v in data.items()
+    }
+
 
 HARD_CASES = ["scenarios/angled", "scenarios/messy", "scenarios/empty-row"]
 

@@ -12,10 +12,11 @@ from numpy.typing import NDArray
 
 from lacuna.imaging import read_image
 from lacuna.vision import OnnxDetector, analyze_shelf
-from lacuna.vision.evaluate import EXPECTED_GAPS, gaps_match
+from lacuna.vision.evaluate import gaps_match, load_expected_gaps
 from tests.conftest import MODELS_DIR
 
 DOCS_DIR = Path(__file__).resolve().parent.parent / "docs"
+EXPECTED_GAPS = load_expected_gaps()
 WEIGHTS = {
     "fp32": (MODELS_DIR / "sku110k-yolo11-s640.onnx", "run scripts/download_weights.py s"),
     "int8": (MODELS_DIR / "sku110k-yolo11-s640-int8.onnx", "run scripts/quantize.py"),

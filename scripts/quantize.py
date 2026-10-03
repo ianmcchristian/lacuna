@@ -3,7 +3,7 @@
 Usage: uv run python scripts/quantize.py [models/sku110k-yolo11-s640.onnx]
 Writes <name>-int8.onnx next to the input.
 
-Two choices that matter, both found by testing (numbers in the README):
+Three choices that matter, all found by testing (numbers in the README):
 - The box decode at the end of the head stays float. It concatenates pixel
   coords (0-640) with scores (0-1) into one tensor, and one INT8 scale over
   both rounds every score to 0: the model finds nothing.
@@ -11,6 +11,9 @@ Two choices that matter, both found by testing (numbers in the README):
   so the photos INT8 is graded on were never used to calibrate it, and their
   bare shelves and odd angles cover more of the activation range. Calibrating
   on the demo shelves instead passed 5-7 of 8 tests; these pass 8 of 8.
+- reduce_range (7-bit weights). On x86 CPUs with AVX2 but no VNNI, the
+  u8 x s8 kernel can saturate. Full-range weights passed 8/8 on ARM and 6/8
+  on the x86 CI runner; Render is x86.
 """
 
 import sys
@@ -78,6 +81,7 @@ def main(source: str = "models/sku110k-yolo11-s640.onnx") -> None:
             activation_type=QuantType.QUInt8,
             weight_type=QuantType.QInt8,
             per_channel=True,
+            reduce_range=True,
             calibrate_method=CalibrationMethod.MinMax,
             nodes_to_exclude=decode_nodes(model),
         )

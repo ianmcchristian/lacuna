@@ -15,9 +15,10 @@ from statistics import mean, median
 
 from lacuna.imaging import read_image
 from lacuna.vision import OnnxDetector, analyze_shelf
-from lacuna.vision.evaluate import EXPECTED_GAPS, HARD_CASES, box_agreement, gaps_match
+from lacuna.vision.evaluate import HARD_CASES, box_agreement, gaps_match, load_expected_gaps
 
 ROOT = Path(__file__).resolve().parent.parent
+EXPECTED_GAPS = load_expected_gaps()
 MODELS = {
     "YOLO11s fp32 (baseline)": "sku110k-yolo11-s640.onnx",
     "YOLO11s INT8": "sku110k-yolo11-s640-int8.onnx",
