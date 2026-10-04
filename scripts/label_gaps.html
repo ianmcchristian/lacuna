@@ -1,0 +1,142 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Label shelf gaps</title>
+<style>
+  body { margin: 0; font: 15px system-ui, sans-serif; background: #1d1d1f; color: #f5f5f7; }
+  header { display: flex; gap: 1rem; align-items: center; padding: 0.6rem 1rem; background: #2c2c2e; flex-wrap: wrap; }
+  header h1 { font-size: 1rem; margin: 0; }
+  button { font: inherit; padding: 0.4rem 0.9rem; border-radius: 6px; border: 1px solid #888; background: #3a3a3c; color: inherit; cursor: pointer; }
+  button.primary { background: #0a84ff; border-color: #0a84ff; }
+  .done { color: #30d158; font-weight: 600; }
+  .help { padding: 0.4rem 1rem; color: #c7c7cc; font-size: 0.9rem; }
+  .help b { color: #f5f5f7; }
+  #wrap { padding: 0 1rem 1rem; }
+  canvas { max-width: 100%; cursor: crosshair; display: block; }
+</style>
+</head>
+<body>
+<header>
+  <h1 id="title">Loading…</h1>
+  <span id="status"></span>
+  <button id="prev">Prev (p)</button>
+  <button id="next">Next (n)</button>
+  <button id="undo">Undo (z)</button>
+  <button id="done" class="primary">Done with this photo (d)</button>
+  <span id="progress"></span>
+</header>
+<p class="help">
+  <b>Drag a box over every hole</b>: a spot on a shelf where at least one more product would fit,
+  front facing, and you can see shelf or back wall. One box per hole, from the products on
+  either side, about as tall as them. Click a box and press Delete to remove it.
+  Skip shelves that are cut off at the top or bottom of the photo. If a photo has no holes,
+  just press Done.
+</p>
+<div id="wrap"><canvas id="canvas"></canvas></div>
+<script>
+const canvas = document.getElementById("canvas");
+const ctx = canvas.getContext("2d");
+let photos = [], labels = {}, index = 0, image = null, drag = null, selected = -1;
+
+const current = () => photos[index];
+const entry = () => (labels[current()] ??= { done: false, gaps: [] });
+
+async function save() {
+  await fetch(`/api/labels/${encodeURIComponent(current())}`, {
+    method: "PUT", headers: { "content-type": "application/json" }, body: JSON.stringify(entry()),
+  });
+  render();
+}
+
+function render() {
+  if (!image) return;
+  ctx.drawImage(image, 0, 0);
+  const w = canvas.width, h = canvas.height;
+  const lw = Math.max(2, Math.round(w / 500));
+  entry().gaps.forEach(([x1, y1, x2, y2], i) => {
+    ctx.fillStyle = i === selected ? "rgba(255, 214, 10, 0.45)" : "rgba(255, 214, 10, 0.2)";
+    ctx.fillRect(x1 * w, y1 * h, (x2 - x1) * w, (y2 - y1) * h);
+    ctx.strokeStyle = "#ffd60a"; ctx.lineWidth = i === selected ? lw * 2 : lw;
+    ctx.strokeRect(x1 * w, y1 * h, (x2 - x1) * w, (y2 - y1) * h);
+  });
+  if (drag) {
+    ctx.strokeStyle = "#0a84ff"; ctx.lineWidth = lw;
+    ctx.strokeRect(drag.x0 * w, drag.y0 * h, (drag.x1 - drag.x0) * w, (drag.y1 - drag.y0) * h);
+  }
+  const doneCount = photos.filter((p) => labels[p]?.done).length;
+  document.getElementById("title").textContent = `${current()} (${index + 1} of ${photos.length})`;
+  document.getElementById("status").innerHTML = entry().done
+    ? `<span class="done">done, ${entry().gaps.length} holes</span>` : `${entry().gaps.length} holes, not done`;
+  document.getElementById("progress").textContent = `${doneCount} of ${photos.length} photos done`;
+}
+
+async function show(i) {
+  index = (i + photos.length) % photos.length;
+  selected = -1;
+  const img = new Image();
+  img.src = `/photo/${encodeURIComponent(current())}`;
+  await img.decode();
+  image = img; canvas.width = img.width; canvas.height = img.height;
+  render();
+}
+
+function point(event) {
+  const r = canvas.getBoundingClientRect();
+  const clamp = (v) => Math.min(1, Math.max(0, v));
+  return [clamp((event.clientX - r.left) / r.width), clamp((event.clientY - r.top) / r.height)];
+}
+
+canvas.addEventListener("mousedown", (e) => {
+  const [x, y] = point(e);
+  drag = { x0: x, y0: y, x1: x, y1: y };
+});
+canvas.addEventListener("mousemove", (e) => {
+  if (!drag) return;
+  [drag.x1, drag.y1] = point(e);
+  render();
+});
+window.addEventListener("mouseup", (e) => {
+  if (!drag) return;
+  const [x, y] = point(e);
+  const box = [Math.min(drag.x0, x), Math.min(drag.y0, y), Math.max(drag.x0, x), Math.max(drag.y0, y)];
+  drag = null;
+  if ((box[2] - box[0]) * canvas.width < 8 || (box[3] - box[1]) * canvas.height < 8) {
+    // a click, not a drag: select the box under it
+    selected = entry().gaps.findIndex(([x1, y1, x2, y2]) => x >= x1 && x <= x2 && y >= y1 && y <= y2);
+    render();
+    return;
+  }
+  entry().gaps.push(box.map((v) => Math.round(v * 10000) / 10000));
+  entry().done = false;
+  selected = -1;
+  save();
+});
+
+function undo() { if (entry().gaps.pop()) { entry().done = false; save(); } }
+function removeSelected() {
+  if (selected < 0) return;
+  entry().gaps.splice(selected, 1); selected = -1; entry().done = false; save();
+}
+async function markDone() { entry().done = true; await save(); show(index + 1); }
+
+document.getElementById("prev").onclick = () => show(index - 1);
+document.getElementById("next").onclick = () => show(index + 1);
+document.getElementById("undo").onclick = undo;
+document.getElementById("done").onclick = markDone;
+window.addEventListener("keydown", (e) => {
+  if (e.key === "n") show(index + 1);
+  else if (e.key === "p") show(index - 1);
+  else if (e.key === "z") undo();
+  else if (e.key === "d") markDone();
+  else if (e.key === "Delete" || e.key === "Backspace") removeSelected();
+});
+
+fetch("/api/photos").then((r) => r.json()).then((data) => {
+  photos = data.photos; labels = data.labels;
+  const firstOpen = photos.findIndex((p) => !labels[p]?.done);
+  show(firstOpen < 0 ? 0 : firstOpen);
+});
+</script>
+</body>
+</html>

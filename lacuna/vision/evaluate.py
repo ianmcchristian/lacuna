@@ -6,10 +6,11 @@ Photo names are paths under docs/ without the .jpg.
 """
 
 import json
+from collections.abc import Sequence
 from pathlib import Path
 
 from lacuna.vision.gaps import Gap
-from lacuna.vision.types import Box
+from lacuna.vision.types import Box, Rect
 
 GAP_TOLERANCE_PX = 25
 
@@ -44,12 +45,33 @@ def gaps_match(
     )
 
 
-def iou(a: Box, b: Box) -> float:
+def iou(a: Rect, b: Rect) -> float:
     inter = max(0.0, min(a.x2, b.x2) - max(a.x1, b.x1)) * max(
         0.0, min(a.y2, b.y2) - max(a.y1, b.y1)
     )
-    union = a.width * a.height + b.width * b.height - inter
-    return inter / union if union > 0 else 0.0
+    area = (a.x2 - a.x1) * (a.y2 - a.y1) + (b.x2 - b.x1) * (b.y2 - b.y1)
+    return inter / (area - inter) if area - inter > 0 else 0.0
+
+
+def greedy_match(
+    reference: Sequence[Rect], candidate: Sequence[Rect], min_iou: float
+) -> list[tuple[int, int]]:
+    """One-to-one (reference, candidate) index pairs, best IoU first."""
+    pairs = sorted(
+        ((iou(r, c), i, j) for i, r in enumerate(reference) for j, c in enumerate(candidate)),
+        reverse=True,
+    )
+    used_ref: set[int] = set()
+    used_cand: set[int] = set()
+    matches = []
+    for overlap, i, j in pairs:
+        if overlap < min_iou:
+            break
+        if i not in used_ref and j not in used_cand:
+            used_ref.add(i)
+            used_cand.add(j)
+            matches.append((i, j))
+    return matches
 
 
 def box_agreement(
@@ -57,21 +79,9 @@ def box_agreement(
 ) -> tuple[float, float]:
     """(recall, precision) of candidate boxes against a reference model's boxes.
 
-    Greedy one-to-one matching, best IoU first. Two empty lists agree fully.
+    Two empty lists agree fully.
     """
-    pairs = sorted(
-        ((iou(r, c), i, j) for i, r in enumerate(reference) for j, c in enumerate(candidate)),
-        reverse=True,
-    )
-    used_ref: set[int] = set()
-    used_cand: set[int] = set()
-    for overlap, i, j in pairs:
-        if overlap < min_iou:
-            break
-        if i not in used_ref and j not in used_cand:
-            used_ref.add(i)
-            used_cand.add(j)
-    matched = len(used_ref)
+    matched = len(greedy_match(reference, candidate, min_iou))
     recall = matched / len(reference) if reference else 1.0
     precision = matched / len(candidate) if candidate else 1.0
     return recall, precision
