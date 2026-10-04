@@ -92,9 +92,13 @@ def main() -> None:
     parser.add_argument("--no-browser", action="store_true")
     args = parser.parse_args()
 
-    server = ThreadingHTTPServer(("127.0.0.1", args.port), make_handler(args.folder))
-    url = f"http://127.0.0.1:{args.port}/"
-    print(f"labeling {args.folder} at {url} (Ctrl+C to stop)")
+    handler = make_handler(args.folder)
+    try:
+        server = ThreadingHTTPServer(("127.0.0.1", args.port), handler)
+    except OSError:  # port taken by something else: let the OS pick a free one
+        server = ThreadingHTTPServer(("127.0.0.1", 0), handler)
+    url = f"http://127.0.0.1:{server.server_address[1]}/"
+    print(f"labeling {args.folder} at {url} (Ctrl+C to stop)", flush=True)
     if not args.no_browser:
         webbrowser.open(url)
     with contextlib.suppress(KeyboardInterrupt):
