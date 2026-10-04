@@ -113,6 +113,45 @@ regression shelves and checks it finds the same gaps as Python, within the same
 Threads stay at 1: multi-threaded WASM needs cross-origin isolation headers,
 and GitHub Pages can't send them.
 
+## Real store photos
+
+The 8 regression shelves are generated images. To see how it holds up in a
+real aisle, I took 7 photos in a Walmart (pet treats, juice coolers, snack
+bars, mac and cheese, condiments) and marked every real hole by hand with
+`scripts/label_gaps.py`: 30 holes in all. `scripts/evaluate_real.py` runs them
+through the same path as the API and counts a found gap only if it overlaps a
+marked hole at IoU 0.3 or better, one to one. The photos stay local (they carry
+location data), so these numbers can't be rerun from the repo.
+
+| Gap logic | Holes found | False gaps | Recall | Precision |
+|---|---|---|---|---|
+| Rows + width rule only | 22 of 30 | 70 | 73% | 24% |
+| + drop gaps that are mostly product | 22 of 30 | 31 | 73% | 42% |
+
+fp32 and INT8 scored the same, apart from INT8 finding 74 false gaps before the
+fix. Per photo, a single bay is close to right (cat treats: 7 of 7, 3 false;
+condiments: 6 of 6, 1 false), and wide photos of two or three bays are where it
+breaks (mac and cheese: 0 of 2 found, 9 false).
+
+What went wrong: products were found fine (48-170 per photo), but the row step
+assumes the shelves line up across the whole photo. In a real aisle the next
+bay's shelves sit at a different height, and stock is stacked two high, so rows
+from different shelves chain together and the "gaps" along them run straight
+through products. The fix checks each gap against every product box and drops
+it if more than 20% of it is covered. That cut false gaps by more than half
+and lost no real holes.
+
+Caveats: 7 photos from one store, labeled by me, and I chose the 20% cutoff on
+these same photos (10-20% all scored about the same), so 42% is a best case
+until it's checked on new photos. Most misses are narrow single-product holes
+and dark cooler shelves. The real fix for the false gaps is finding the shelf
+edges (or splitting the photo into bays) before grouping rows.
+
+```bash
+uv run python scripts/label_gaps.py samples/real     # mark holes in a browser
+uv run python scripts/evaluate_real.py samples/real  # recall, precision, overlays
+```
+
 ## How it works
 
 ```
@@ -132,7 +171,10 @@ photo -> letterbox 640x640 -> YOLO11s (ONNX Runtime) -> NMS -> product boxes
    `0.8x` the row's median product width is a gap. Normal spacing between
    products is about `0.1x`. Row ends are checked against the full shelf width,
    so an empty spot at the edge still counts.
-4. **Score it.** Occupancy = `1 - gap width / shelf width` across every row
+4. **Drop false holes.** A gap that's more than 20% covered by product boxes
+   (from any row) isn't empty space. This catches rows from two bays at
+   different shelf heights chaining together (see Real store photos).
+5. **Score it.** Occupancy = `1 - gap width / shelf width` across every row
    checked.
 
 ## API
@@ -222,14 +264,14 @@ uv run ruff check . && uv run mypy lacuna tests scripts
 cd web && npm test && npm run e2e               # UI: jsdom + real browser
 ```
 
-63 Python tests (97% coverage) cover the API contract, upload edge cases (wrong
+67 Python tests (97% coverage) cover the API contract, upload edge cases (wrong
 type, too big, empty, corrupt), the gap logic, pre/post-processing, the SQL
 reports, Alembic migrations matching the models, and an upload being scanned by
 a second app instance (a fresh replica). With the weights downloaded, they also
 run the fp32 and INT8 models on 8 shelf photos, checking every hole's row and
 position, and inpaint one bottle out of a full row to check the gap lands there.
 
-20 Vitest tests cover the UI states in jsdom (with axe) and the TypeScript gap
+22 Vitest tests cover the UI states in jsdom (with axe) and the TypeScript gap
 logic. 13 Playwright tests run the production build in Chromium: accessibility,
 the keyboard flow, and real in-browser scans of all 8 regression shelves
 checked against the Python results. Browser e2e needs the INT8 model in
@@ -289,7 +331,9 @@ whole flow by keyboard. Vitest runs axe again in jsdom on each component state.
   holes.
 - It finds *where* product is missing, not *which* product. Naming the missing
   item would need a product catalog or planogram.
-- The test photos are synthetic. Real store photos will be harder.
+- The regression photos are synthetic. On 7 real store photos it finds 73% of
+  holes, and 58% of the gaps it reports are false (see Real store photos).
+  Photos of one bay work much better than wide shots of several.
 - Small products in very large photos lose detail at 640x640.
 
 ## Credits and license

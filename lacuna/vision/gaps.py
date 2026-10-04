@@ -7,7 +7,12 @@
    default of 0.8 catches a single out without flagging spacing. The row's
    ends are checked against the full shelf span too, so an empty spot at
    the edge still counts.
-3. Occupancy = 1 - gap width / shelf width, over every row we could check.
+3. Drop any gap that's more than max_covered covered by product boxes, from
+   any row. A hole is empty space. On real aisle photos, rows from two bays
+   at different shelf heights can chain into one, and the "gaps" along it
+   run straight through products. On 7 hand-labeled store photos this cut
+   false gaps by more than half without losing a real hole (README).
+4. Occupancy = 1 - gap width / shelf width, over every row we could check.
 
 Skipped rows: fewer than min_row_size products (noise), or mostly cut off
 by the top or bottom of the photo. A shelf you can only half see has no
@@ -18,12 +23,14 @@ Limits: a row with no products at all has nothing to detect, so it won't
 show up.
 """
 
+import itertools
 from dataclasses import dataclass
 from statistics import median
 
 from lacuna.vision.types import Box
 
 DEFAULT_MIN_GAP_RATIO = 0.8
+DEFAULT_MAX_COVERED = 0.2  # 0.1-0.2 all scored about the same; 0.25+ lets bands back in
 EDGE_MARGIN = 0.01  # a box this close to the top or bottom of the frame is cut off
 
 
@@ -85,6 +92,36 @@ def row_gaps(
     return gaps
 
 
+def union_length(spans: list[tuple[float, float]]) -> float:
+    """Total length covered by a set of intervals, overlaps counted once."""
+    total, reach = 0.0, float("-inf")
+    for lo, hi in sorted(spans):
+        lo = max(lo, reach)
+        if hi > lo:
+            total += hi - lo
+            reach = hi
+    return total
+
+
+def covered_fraction(gap: Gap, boxes: list[Box]) -> float:
+    """Share of the gap's area covered by product boxes. Exact: sweeps the vertical
+    slabs between box edges and adds up the covered height in each."""
+    area = (gap.x2 - gap.x1) * (gap.y2 - gap.y1)
+    if area <= 0:
+        return 1.0
+    clipped = [
+        (max(b.x1, gap.x1), max(b.y1, gap.y1), min(b.x2, gap.x2), min(b.y2, gap.y2)) for b in boxes
+    ]
+    clipped = [c for c in clipped if c[0] < c[2] and c[1] < c[3]]
+    edges = sorted({x for c in clipped for x in (c[0], c[2])})
+    covered = sum(
+        (right - left)
+        * union_length([(c[1], c[3]) for c in clipped if c[0] <= left and c[2] >= right])
+        for left, right in itertools.pairwise(edges)
+    )
+    return covered / area
+
+
 def is_cut_off(row: list[Box], image_height: float) -> bool:
     """True if most of the row runs off the top or bottom of the photo."""
     margin = EDGE_MARGIN * image_height
@@ -97,6 +134,7 @@ def analyze_shelf(
     min_gap_ratio: float = DEFAULT_MIN_GAP_RATIO,
     min_row_size: int = 2,
     image_height: float | None = None,
+    max_covered: float = DEFAULT_MAX_COVERED,
 ) -> ShelfAnalysis:
     """Rows, gaps, and an occupancy estimate for one shelf photo.
 
@@ -117,7 +155,8 @@ def analyze_shelf(
         if image_height is not None and is_cut_off(row, image_height):
             continue
         checked_rows += 1
-        gaps.extend(row_gaps(row, index, left, right, min_gap_ratio))
+        found = row_gaps(row, index, left, right, min_gap_ratio)
+        gaps.extend(g for g in found if covered_fraction(g, boxes) <= max_covered)
 
     if not checked_rows or right <= left:
         return ShelfAnalysis(rows=rows, gaps=gaps, occupancy=None)

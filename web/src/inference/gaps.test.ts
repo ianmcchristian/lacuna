@@ -1,11 +1,13 @@
 // Same cases as tests/test_gaps.py, so the port can't drift from the Python.
 import { describe, expect, it } from "vitest";
-import { Box, analyzeShelf } from "./gaps";
+import { Box, analyzeShelf, coveredFraction } from "./gaps";
 
 // 10 slots, 60 px apart, as in tests/conftest.py
 const FULL_ROW = Array.from({ length: 10 }, (_, i) => 10 + i * 60);
 const GAPPY_ROW = FULL_ROW.filter((_, i) => i !== 4 && i !== 5);
 const shelfRow = (y: number, xs: number[]): Box[] => xs.map((x) => ({ x1: x, y1: y, x2: x + 50, y2: y + 120, score: 0.9 }));
+
+const b = (x1: number, y1: number, x2: number, y2: number): Box => ({ x1, y1, x2, y2, score: 0.9 });
 
 describe("analyzeShelf", () => {
   it("knows nothing about an empty photo", () => {
@@ -47,5 +49,19 @@ describe("analyzeShelf", () => {
     const result = analyzeShelf([...shelfRow(0, FULL_ROW), { x1: 500, y1: 300, x2: 550, y2: 420, score: 0.9 }]);
     expect(result.rows).toHaveLength(2);
     expect(result.gaps).toEqual([]);
+  });
+
+  it("drops a gap that runs through another row's products", () => {
+    const row = [b(0, 100, 50, 200), b(200, 110, 250, 210), b(300, 100, 350, 200)];
+    const lowerBay = [b(55, 160, 125, 260), b(125, 160, 195, 260)];
+    expect(analyzeShelf(row).gaps.map((g) => g.x1)).toEqual([50, 250]);
+    expect(analyzeShelf([...row, ...lowerBay]).gaps.map((g) => g.x1)).toEqual([250]);
+  });
+
+  it("counts overlapping boxes once when measuring cover", () => {
+    const gap = { row: 0, x1: 0, y1: 0, x2: 100, y2: 100, width_ratio: 1 };
+    expect(coveredFraction(gap, [])).toBe(0);
+    expect(coveredFraction(gap, [b(0, 0, 50, 100), b(25, 0, 50, 100)])).toBe(0.5);
+    expect(coveredFraction(gap, [b(-10, -10, 110, 50), b(0, 40, 100, 200)])).toBe(1);
   });
 });

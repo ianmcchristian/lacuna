@@ -1,7 +1,7 @@
 import pytest
 
-from lacuna.vision import Box, analyze_shelf
-from lacuna.vision.gaps import group_rows
+from lacuna.vision import Box, Gap, analyze_shelf
+from lacuna.vision.gaps import covered_fraction, group_rows
 from tests.conftest import FULL_ROW, GAPPY_ROW, shelf_row
 
 
@@ -81,3 +81,22 @@ def test_rows_group_mixed_heights() -> None:
     rows = group_rows(boxes)
     assert [len(r) for r in rows] == [3, 2]
     assert [b.x1 for b in rows[0]] == [0, 60, 120]
+
+
+def test_covered_fraction_counts_overlaps_once() -> None:
+    gap = Gap(0, 0, 0, 100, 100, 1.0)
+    assert covered_fraction(gap, []) == 0
+    assert covered_fraction(gap, [Box(0, 0, 50, 100), Box(25, 0, 50, 100)]) == 0.5
+    assert covered_fraction(gap, [Box(-10, -10, 110, 50), Box(0, 40, 100, 200)]) == 1
+
+
+def test_gap_running_through_other_products_is_dropped() -> None:
+    # A neighboring bay's shelf sits lower, so its products are a separate row
+    # but still fill most of the "hole" between this row's products.
+    row = [Box(0, 100, 50, 200), Box(200, 110, 250, 210), Box(300, 100, 350, 200)]
+    lower_bay = [Box(55, 160, 125, 260), Box(125, 160, 195, 260)]
+    assert [g.x1 for g in analyze_shelf(row).gaps] == [50, 250]
+    analysis = analyze_shelf([*row, *lower_bay])
+    assert len(analysis.rows) == 2
+    assert [g.x1 for g in analysis.gaps] == [250]
+    assert [g.x1 for g in analyze_shelf([*row, *lower_bay], max_covered=1).gaps] == [50, 250, 195]

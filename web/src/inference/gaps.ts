@@ -25,6 +25,7 @@ export interface ShelfAnalysis {
 }
 
 export const DEFAULT_MIN_GAP_RATIO = 0.8;
+export const DEFAULT_MAX_COVERED = 0.2;
 const EDGE_MARGIN = 0.01;
 
 const median = (values: number[]) => {
@@ -75,6 +76,36 @@ function rowGaps(row: Box[], index: number, left: number, right: number, minGapR
   return gaps;
 }
 
+function unionLength(spans: Array<[number, number]>): number {
+  let total = 0;
+  let reach = -Infinity;
+  for (const [start, hi] of [...spans].sort((a, b) => a[0] - b[0] || a[1] - b[1])) {
+    const lo = Math.max(start, reach);
+    if (hi > lo) {
+      total += hi - lo;
+      reach = hi;
+    }
+  }
+  return total;
+}
+
+// Share of the gap covered by product boxes; see covered_fraction in gaps.py.
+export function coveredFraction(gap: Gap, boxes: Box[]): number {
+  const area = (gap.x2 - gap.x1) * (gap.y2 - gap.y1);
+  if (area <= 0) return 1;
+  const clipped = boxes
+    .map((b) => [Math.max(b.x1, gap.x1), Math.max(b.y1, gap.y1), Math.min(b.x2, gap.x2), Math.min(b.y2, gap.y2)])
+    .filter(([x1, y1, x2, y2]) => x1 < x2 && y1 < y2);
+  const edges = [...new Set(clipped.flatMap((c) => [c[0], c[2]]))].sort((a, b) => a - b);
+  let covered = 0;
+  for (let i = 0; i + 1 < edges.length; i++) {
+    const [left, right] = [edges[i], edges[i + 1]];
+    const spans = clipped.filter((c) => c[0] <= left && c[2] >= right).map((c): [number, number] => [c[1], c[3]]);
+    covered += (right - left) * unionLength(spans);
+  }
+  return covered / area;
+}
+
 function isCutOff(row: Box[], imageHeight: number): boolean {
   const margin = EDGE_MARGIN * imageHeight;
   const clipped = row.filter((b) => b.y1 <= margin || b.y2 >= imageHeight - margin).length;
@@ -86,6 +117,7 @@ export function analyzeShelf(
   imageHeight: number | null = null,
   minGapRatio = DEFAULT_MIN_GAP_RATIO,
   minRowSize = 2,
+  maxCovered = DEFAULT_MAX_COVERED,
 ): ShelfAnalysis {
   if (!boxes.length) return { rows: [], gaps: [], occupancy: null };
 
@@ -99,7 +131,8 @@ export function analyzeShelf(
     if (row.length < minRowSize) return;
     if (imageHeight !== null && isCutOff(row, imageHeight)) return;
     checkedRows += 1;
-    gaps.push(...rowGaps(row, index, left, right, minGapRatio));
+    const found = rowGaps(row, index, left, right, minGapRatio);
+    gaps.push(...found.filter((g) => coveredFraction(g, boxes) <= maxCovered));
   });
 
   if (!checkedRows || right <= left) return { rows, gaps, occupancy: null };
