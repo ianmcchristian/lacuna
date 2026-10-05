@@ -18,9 +18,10 @@ leaves your device. The other option sends it to the API, which saves the scan
 but runs on a free instance with a tenth of a CPU, so it takes several seconds.
 Saved scans with a shelf code show up under
 [Shelf history](https://ianmcchristian.github.io/lacuna/#/shelves): every shelf
-ranked emptiest first, and each shelf's occupancy over time. The
-`demo-simulated` shelf there is one stock photo with products painted out a few
-at a time and then restocked; the photos are simulated, but every number is
+ranked emptiest first, each shelf's occupancy over time, and what sold out
+since a stocked baseline scan. The `demo-simulated` shelf there is one stock
+photo with products painted out a few at a time, restocked, then selling down
+again in a rotated, shifted retake; the photos are simulated, but every number is
 the live API's own scan of them
 ([`scripts/seed_demo_shelf.py`](scripts/seed_demo_shelf.py)).
 
@@ -184,6 +185,36 @@ photo -> letterbox 640x640 -> YOLO11s (ONNX Runtime) -> NMS -> product boxes
 5. **Score it.** Occupancy = `1 - gap width / shelf width` across every row
    checked.
 
+### What sold out (baseline compare)
+
+The model only knows "product", not which one. So a shelf can mark a scan
+taken when it was full as its **baseline**, and later gaps are matched to the
+products that used to be there:
+
+1. **Line the photos up.** A phone retake is never from exactly the same
+   spot. ORB features are matched between the baseline and the new photo
+   (Lowe's ratio test), and RANSAC fits a homography from the good matches.
+   A shelf front is close to flat, so one homography fits it. Warps no
+   handheld retake would make (flips, zooms past 2x, folds) are rejected, and
+   so are photos with under 30 inlier matches: the answer is then "these don't
+   line up", never a guess.
+2. **Map the baseline's products** into the new photo. A product counts as
+   sold out of a gap when at least half of its mapped box falls inside it.
+3. **Show crops** of those products, cut from the baseline photo.
+
+Scored with [`scripts/evaluate_baseline.py`](scripts/evaluate_baseline.py) on
+the fully stocked scenario: 8 random products painted out, then the photo
+retaken 5 ways (rotated up to 6 degrees, zoomed 0.8-1.08x, shifted up to 90 px,
+tilted). Every retake lined up, and every product it named had really been
+removed: **25 of 25** (fp32 and INT8 alike). It found 25 of the 40 removed. With INT8, of
+the 15 misses, 14 were spots where the gap finder reported no gap at all
+(single products, and a few sliver detections the random pick chose), and 1
+sat in a gap but under the 50% overlap. So recall is limited by gap finding,
+not by the alignment. These are simulated retakes, not real ones.
+
+Naming the products (CLIP embeddings of the crops matched against a catalog
+in pgvector) is the next step.
+
 ## API
 
 | Method | Path | What it does |
@@ -194,6 +225,9 @@ photo -> letterbox 640x640 -> YOLO11s (ONNX Runtime) -> NMS -> product boxes
 | `GET` | `/results/{scan_id}/overlay` | The photo with products in green, gaps in red |
 | `GET` | `/shelves/{code}/history` | A shelf's scans over time, with the change vs the scan before |
 | `GET` | `/reports/worst-shelves` | Shelves ranked by occupancy on their latest scan |
+| `POST` | `/shelves/{code}/baseline` | Mark one of the shelf's scans as its stocked baseline |
+| `GET` | `/results/{scan_id}/missing` | For each gap, the baseline products that used to sit there |
+| `GET` | `/results/{scan_id}/products/{id}/crop` | One detected product cut out of the photo |
 | `GET` | `/health` | Liveness |
 | `GET` | `/ready` | Readiness: database reachable and model loaded |
 | `GET` | `/metrics` | Prometheus metrics |
@@ -341,10 +375,15 @@ whole flow by keyboard. Vitest runs axe again in jsdom on each component state.
   can't be grouped (see the angled scenario).
 - Products the model misses, like boxes knocked onto their side, read as
   holes.
-- It finds *where* product is missing, not *which* product. Naming the missing
-  item would need a product catalog or planogram.
+- It finds *where* product is missing, not *which* product. With a baseline
+  scan it can show *what used to be there* as a picture; naming it needs a
+  product catalog.
+- Baseline compare assumes the shelf front is roughly flat and the retake is
+  from about the same spot. A different angle on a deep shelf breaks the
+  single homography.
 - The regression photos are synthetic. On 7 real store photos it finds 73% of
   holes, and 58% of the gaps it reports are false (see Real store photos).
+  Baseline compare has only been tested on simulated retakes so far.
   Photos of one bay work much better than wide shots of several.
 - Small products in very large photos lose detail at 640x640.
 

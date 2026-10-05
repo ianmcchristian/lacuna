@@ -5,7 +5,6 @@ Every check runs on the float model and its INT8 copy (scripts/quantize.py).
 
 from pathlib import Path
 
-import cv2
 import numpy as np
 import pytest
 from numpy.typing import NDArray
@@ -13,6 +12,7 @@ from numpy.typing import NDArray
 from lacuna.imaging import read_image
 from lacuna.vision import OnnxDetector, analyze_shelf
 from lacuna.vision.evaluate import gaps_match, load_expected_gaps
+from lacuna.vision.simulate import paint_out
 from tests.conftest import MODELS_DIR
 
 DOCS_DIR = Path(__file__).resolve().parent.parent / "docs"
@@ -52,21 +52,15 @@ def test_finds_every_hole_and_nothing_else(detector: OnnxDetector, name: str) ->
 
 
 def test_inpainted_hole_is_found(detector: OnnxDetector) -> None:
-    """Paint one bottle out of the full top row and check a gap shows up right there.
-
-    Inpainting, not a solid fill: a flat dark rectangle the size of a can
-    still looks like a can to the model.
-    """
+    """Paint one bottle out of the full top row and check a gap shows up right there."""
     image = photo("demo/bottles")
     before = analyze_shelf(detector.detect(image))
     assert not [g for g in before.gaps if g.row == 0]  # top row starts full
     top = before.rows[0]
     target = top[len(top) // 2]
 
-    mask = np.zeros(image.shape[:2], dtype=np.uint8)
-    x1, y1, x2, y2 = (int(v) for v in (target.x1, target.y1, target.x2, target.y2))
-    mask[y1:y2, x1:x2] = 255
-    cut = np.asarray(cv2.inpaint(image, mask, 5, cv2.INPAINT_TELEA), dtype=np.uint8)
+    x1, x2 = int(target.x1), int(target.x2)
+    cut = paint_out(image, [target])
 
     after = analyze_shelf(detector.detect(cut))
     hits = [g for g in after.gaps if g.row == 0 and g.x1 <= x1 + 10 and g.x2 >= x2 - 10]
