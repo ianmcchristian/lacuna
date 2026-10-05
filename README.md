@@ -16,6 +16,9 @@ restock first.
 model in your browser, so a scan takes about half a second and the photo never
 leaves your device. The other option sends it to the API, which saves the scan
 but runs on a free instance with a tenth of a CPU, so it takes several seconds.
+Saved scans with a shelf code show up under
+[Shelf history](https://ianmcchristian.github.io/lacuna/#/shelves): every shelf
+ranked emptiest first, and each shelf's occupancy over time.
 
 ![Upload UI showing a scan with 40 products, 2 gaps, and 89% occupancy](docs/screenshot.jpg)
 
@@ -201,6 +204,10 @@ curl -X POST localhost:8000/detect -H 'content-type: application/json' -d '{"ima
 The two reports are plain SQL in [`lacuna/db/reports.py`](lacuna/db/reports.py):
 shelf history uses `LAG()` to get the occupancy change between scans, and worst
 shelves uses `ROW_NUMBER()` to pick each shelf's latest scan before ranking.
+The UI's Shelf history pages are built on these two endpoints: a table of
+shelves, emptiest first, and for each shelf a chart of occupancy over time
+(hand-drawn SVG, with the same data as a table for screen readers) plus a link
+to the overlay from every scan.
 
 ## Run it
 
@@ -271,10 +278,10 @@ a second app instance (a fresh replica). With the weights downloaded, they also
 run the fp32 and INT8 models on 8 shelf photos, checking every hole's row and
 position, and inpaint one bottle out of a full row to check the gap lands there.
 
-22 Vitest tests cover the UI states in jsdom (with axe) and the TypeScript gap
-logic. 13 Playwright tests run the production build in Chromium: accessibility,
-the keyboard flow, and real in-browser scans of all 8 regression shelves
-checked against the Python results. Browser e2e needs the INT8 model in
+33 Vitest tests cover the UI states in jsdom (with axe), routing, the chart, and
+the TypeScript gap logic. 14 Playwright tests run the production build in
+Chromium: accessibility on every page, the keyboard flow, and real in-browser
+scans of all 8 regression shelves checked against the Python results. Browser e2e needs the INT8 model in
 `models/` (see Run it).
 
 CI runs all of it against Postgres 16, builds the Docker image, starts it, and

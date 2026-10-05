@@ -61,6 +61,10 @@ describe("App", () => {
     render(<App />);
     await user.tab();
     expect(screen.getByText("Skip to content")).toHaveFocus();
+    await user.tab();
+    expect(screen.getByRole("link", { name: "Scan a shelf" })).toHaveFocus();
+    await user.tab();
+    expect(screen.getByRole("link", { name: "Shelf history" })).toHaveFocus();
     await user.tab(); // jsdom can't run the model, so the server is the only choice
     expect(screen.getByRole("radio", { name: "On the server" })).toHaveFocus();
     await user.tab();
@@ -129,6 +133,10 @@ describe("App", () => {
     expect(screen.getByText("91%")).toBeInTheDocument();
     expect(screen.getByRole("img")).toHaveAccessibleName(/20 products .* 1 gap shaded red/);
     expect(screen.getByRole("table", { name: /Gaps by shelf row/ })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "See the history for shelf aisle4-bay2" })).toHaveAttribute(
+      "href",
+      "#/shelves/aisle4-bay2",
+    );
     expect(fetchMock).toHaveBeenCalledTimes(2);
     await expectNoA11yViolations(container);
   });
@@ -179,6 +187,7 @@ describe("App", () => {
 
     expect(await screen.findByText(/Ran in your browser/)).toBeInTheDocument();
     expect(screen.getByRole("img")).toHaveAttribute("src", "blob:overlay");
+    expect(screen.queryByRole("link", { name: /See the history/ })).not.toBeInTheDocument();
     expect(scanSpy).toHaveBeenCalledOnce();
     expect(fetchMock).not.toHaveBeenCalled();
     await expectNoA11yViolations(container);

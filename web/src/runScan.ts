@@ -8,6 +8,7 @@ export type Where = "browser" | "server";
 export interface Result {
   key: string; // new for every scan
   where: Where;
+  shelf: string | null; // saved under this shelf code (server scans only)
   model: string;
   product_count: number;
   gap_count: number;
@@ -29,13 +30,14 @@ export async function runScan(where: Where, file: File, shelf: string): Promise<
     const { scanInBrowser } = await import("./inference/browserScan");
     const { overlay, ...scan } = await scanInBrowser(file);
     browserScans += 1;
-    return { ...scan, key: `browser-${browserScans}`, where, overlay: URL.createObjectURL(overlay) };
+    return { ...scan, key: `browser-${browserScans}`, where, shelf: null, overlay: URL.createObjectURL(overlay) };
   }
 
   const scan = await scanShelf(file, shelf);
   return {
     key: scan.id,
     where,
+    shelf: shelf || null,
     model: scan.model,
     product_count: scan.product_count,
     gap_count: scan.gap_count,

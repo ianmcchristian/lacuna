@@ -1,38 +1,12 @@
-import { useState } from "react";
-import { ApiError } from "./api";
-import { SamplePicker } from "./SamplePicker";
-import { ScanResult } from "./ScanResult";
-import { UploadForm } from "./UploadForm";
-import { WherePicker } from "./WherePicker";
-import { Result, Where, browserSupported, runScan } from "./runScan";
-import { Sample, loadSample } from "./samples";
-
-type State =
-  | { kind: "idle" }
-  | { kind: "scanning"; what: string }
-  | { kind: "done"; result: Result }
-  | { kind: "error"; message: string };
-
-function errorMessage(err: unknown, where: Where) {
-  if (err instanceof ApiError) return err.message;
-  if (where === "browser") return "Couldn't run the model in this browser. Try running it on the server instead.";
-  return "Something went wrong. Try again.";
-}
+import { ScanPage } from "./ScanPage";
+import { ShelfPage } from "./ShelfPage";
+import { ShelvesPage } from "./ShelvesPage";
+import { href, useRoute } from "./route";
 
 export function App() {
-  const [state, setState] = useState<State>({ kind: "idle" });
-  const [where, setWhere] = useState<Where>(browserSupported() ? "browser" : "server");
-  const busy = state.kind === "scanning";
-
-  async function run(what: string, getFile: () => Promise<File>, shelf = "") {
-    const place = where === "browser" ? "in your browser" : "on the server";
-    setState({ kind: "scanning", what: `${what} ${place}` });
-    try {
-      setState({ kind: "done", result: await runScan(where, await getFile(), shelf) });
-    } catch (err) {
-      setState({ kind: "error", message: errorMessage(err, where) });
-    }
-  }
+  // focus moves to the new page's heading on navigation, not on first load
+  const { route, navigated } = useRoute();
+  const historyCurrent = route.page === "shelves" ? "page" : route.page === "shelf" ? "true" : undefined;
 
   return (
     <>
@@ -42,26 +16,25 @@ export function App() {
       <header>
         <h1>Lacuna</h1>
         <p>Upload a shelf photo to find where product is missing.</p>
+        <nav aria-label="Main">
+          <ul>
+            <li>
+              <a href={href.scan} aria-current={route.page === "scan" ? "page" : undefined}>
+                Scan a shelf
+              </a>
+            </li>
+            <li>
+              <a href={href.shelves} aria-current={historyCurrent}>
+                Shelf history
+              </a>
+            </li>
+          </ul>
+        </nav>
       </header>
       <main id="main">
-        <WherePicker where={where} browserOk={browserSupported()} busy={busy} onChange={setWhere} />
-        <UploadForm
-          busy={busy}
-          askShelf={where === "server"}
-          onScan={(file, shelf) => run("your shelf photo", async () => file, shelf)}
-        />
-        <SamplePicker busy={busy} onPick={(sample: Sample) => run(`the ${sample.label} sample`, () => loadSample(sample))} />
-
-        <p role="status" className="status">
-          {state.kind === "scanning" && `Scanning ${state.what}…`}
-        </p>
-        {state.kind === "error" && (
-          <p role="alert" className="error">
-            {state.message}
-          </p>
-        )}
-
-        {state.kind === "done" && <ScanResult scan={state.result} />}
+        {route.page === "scan" && <ScanPage />}
+        {route.page === "shelves" && <ShelvesPage focus={navigated} />}
+        {route.page === "shelf" && <ShelfPage key={route.shelf} shelf={route.shelf} focus={navigated} />}
       </main>
       <footer>
         <p>

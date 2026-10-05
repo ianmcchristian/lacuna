@@ -20,6 +20,28 @@ export interface Scan {
   gaps: Gap[];
 }
 
+export interface ShelfSummary {
+  shelf: string;
+  scan_count: number;
+  avg_occupancy: number | null;
+  latest_occupancy: number | null;
+  latest_gap_count: number | null;
+  last_scanned_at: string;
+}
+
+export interface HistoryPoint {
+  scan_id: string;
+  created_at: string;
+  occupancy: number | null;
+  gap_count: number;
+  occupancy_change: number | null;
+}
+
+export interface ShelfHistory {
+  shelf: string;
+  scans: HistoryPoint[]; // newest first
+}
+
 export class ApiError extends Error {
   constructor(
     readonly status: number,
@@ -29,7 +51,9 @@ export class ApiError extends Error {
   }
 }
 
-async function request<T>(path: string, init: RequestInit): Promise<T> {
+export const WAKING = "Loading… The free server sleeps when idle and can take up to a minute to wake.";
+
+async function request<T>(path: string, init?: RequestInit): Promise<T> {
   let resp: Response;
   try {
     resp = await fetch(`${API_URL}${path}`, init);
@@ -62,6 +86,12 @@ export async function scanShelf(file: File, shelf: string): Promise<Scan> {
     body: JSON.stringify({ image_id: image.id }),
   });
 }
+
+/** Shelves by occupancy on their latest scan, emptiest first. */
+export const getWorstShelves = (limit = 50) => request<ShelfSummary[]>(`/reports/worst-shelves?limit=${limit}`);
+
+export const getShelfHistory = (shelf: string, limit = 200) =>
+  request<ShelfHistory>(`/shelves/${encodeURIComponent(shelf)}/history?limit=${limit}`);
 
 export const overlayUrl = (scanId: string) => `${API_URL}/results/${scanId}/overlay`;
 

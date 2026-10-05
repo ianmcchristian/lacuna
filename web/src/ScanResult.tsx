@@ -1,7 +1,7 @@
 import { useEffect, useRef } from "react";
+import { percent } from "./format";
+import { href } from "./route";
 import type { Result } from "./runScan";
-
-const percent = (value: number | null) => (value === null ? "Unknown" : `${Math.round(value * 100)}%`);
 
 function Verdict({ scan }: { scan: Result }) {
   // no occupancy means no row had enough products to measure, so don't call it full
@@ -58,6 +58,12 @@ export function ScanResult({ scan }: { scan: Result }) {
       </h2>
       <p className="hint">
         {scan.where === "browser" ? "Ran in your browser" : "Ran on the server and saved"} with {scan.model}.
+        {scan.shelf && (
+          <>
+            {" "}
+            <a href={href.shelf(scan.shelf)}>See the history for shelf {scan.shelf}</a>.
+          </>
+        )}
       </p>
 
       <dl className="summary">
