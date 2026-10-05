@@ -3,7 +3,7 @@
 
 import { useId } from "react";
 import type { HistoryPoint } from "./api";
-import { day, percent } from "./format";
+import { axisLabel, percent } from "./format";
 
 const WIDTH = 640;
 const HEIGHT = 240;
@@ -36,14 +36,18 @@ export function plot(scans: HistoryPoint[]): Plotted[] {
   }));
 }
 
+const labelFor = (points: Plotted[]) =>
+  axisLabel(points[0].point.created_at, points[points.length - 1].point.created_at);
+
 export function describe(shelf: string, points: Plotted[]) {
   if (!points.length) return `No scans of ${shelf} could be measured.`;
   const values = points.map((p) => p.point.occupancy ?? 0);
   const first = points[0].point;
   const last = points[points.length - 1].point;
+  const label = labelFor(points);
   const scans = points.length === 1 ? "1 scan" : `${points.length} scans`;
   return (
-    `${scans} from ${day(first.created_at)} to ${day(last.created_at)}. ` +
+    `${scans} from ${label(first.created_at)} to ${label(last.created_at)}. ` +
     `Latest ${percent(last.occupancy)}, lowest ${percent(Math.min(...values))}, highest ${percent(Math.max(...values))}.`
   );
 }
@@ -86,7 +90,7 @@ export function OccupancyChart({ shelf, scans }: { shelf: string; scans: History
           y={HEIGHT - 8}
           textAnchor={xLabels.length === 1 ? "middle" : i === 0 ? "start" : "end"}
         >
-          {day(p.point.created_at)}
+          {labelFor(points)(p.point.created_at)}
         </text>
       ))}
 

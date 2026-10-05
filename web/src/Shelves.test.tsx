@@ -3,7 +3,7 @@ import axe from "axe-core";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { App } from "./App";
 import type { HistoryPoint, ShelfSummary } from "./api";
-import { change } from "./format";
+import { axisLabel, change } from "./format";
 import { plot } from "./OccupancyChart";
 import { parseRoute } from "./route";
 
@@ -98,6 +98,13 @@ describe("chart", () => {
   it("centers a single scan", () => {
     const [only] = plot([point("a", 2, 0.5, null)]);
     expect(only.x).toBeCloseTo(48 + (640 - 48 - 20) / 2);
+  });
+
+  it("labels the axis with times when every scan is on one day", () => {
+    const sameDay = axisLabel("2026-10-05T12:00:00Z", "2026-10-05T12:30:00Z");
+    const days = axisLabel("2026-10-02T12:00:00Z", "2026-10-05T12:00:00Z");
+    expect(sameDay("2026-10-05T12:30:00Z")).toMatch(/\d:30/);
+    expect(days("2026-10-05T12:00:00Z")).toMatch(/Oct/);
   });
 
   it("formats changes in points", () => {

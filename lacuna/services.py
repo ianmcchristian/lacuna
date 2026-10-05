@@ -4,7 +4,7 @@ import time
 
 import numpy as np
 from numpy.typing import NDArray
-from sqlalchemy import select
+from sqlalchemy import delete, func, select
 from sqlalchemy.orm import Session
 
 from lacuna.db.models import DetectionRecord, GapRecord, ImageBlob, ImageRecord, Scan, Shelf
@@ -126,3 +126,26 @@ def get_shelf(session: Session, code: str) -> Shelf:
     if shelf is None:
         raise NotFoundError(f"shelf {code} not found")
     return shelf
+
+
+def delete_shelf(session: Session, code: str) -> int:
+    """Delete a shelf with every image and scan saved under it. Returns the scan count.
+
+    Child rows go first, explicitly, so it doesn't lean on FK cascades
+    (SQLite leaves them off unless asked).
+    """
+    shelf = get_shelf(session, code)
+    image_ids = select(ImageRecord.id).where(ImageRecord.shelf_id == shelf.id)
+    scan_ids = select(Scan.id).where(Scan.image_id.in_(image_ids))
+    scans = session.scalar(select(func.count()).select_from(Scan).where(Scan.id.in_(scan_ids)))
+    for statement in (
+        delete(DetectionRecord).where(DetectionRecord.scan_id.in_(scan_ids)),
+        delete(GapRecord).where(GapRecord.scan_id.in_(scan_ids)),
+        delete(Scan).where(Scan.image_id.in_(image_ids)),
+        delete(ImageBlob).where(ImageBlob.image_id.in_(image_ids)),
+        delete(ImageRecord).where(ImageRecord.shelf_id == shelf.id),
+        delete(Shelf).where(Shelf.id == shelf.id),
+    ):
+        session.execute(statement.execution_options(synchronize_session=False))
+    session.commit()
+    return scans or 0

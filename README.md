@@ -18,7 +18,11 @@ leaves your device. The other option sends it to the API, which saves the scan
 but runs on a free instance with a tenth of a CPU, so it takes several seconds.
 Saved scans with a shelf code show up under
 [Shelf history](https://ianmcchristian.github.io/lacuna/#/shelves): every shelf
-ranked emptiest first, and each shelf's occupancy over time.
+ranked emptiest first, and each shelf's occupancy over time. The
+`demo-simulated` shelf there is one stock photo with products painted out a few
+at a time and then restocked; the photos are simulated, but every number is
+the live API's own scan of them
+([`scripts/seed_demo_shelf.py`](scripts/seed_demo_shelf.py)).
 
 ![Upload UI showing a scan with 40 products, 2 gaps, and 89% occupancy](docs/screenshot.jpg)
 
@@ -219,6 +223,7 @@ uv run python scripts/download_weights.py s      # ~38 MB, pinned revision + sha
 uv run python scripts/quantize.py                # optional: the INT8 copy the image uses
 uv run alembic upgrade head                      # SQLite by default
 uv run uvicorn lacuna.main:create_app --factory --reload
+uv run python scripts/delete_shelf.py <code>...  # drop a shelf and its scans; asks first
 ```
 
 Try the model on a photo without the API:

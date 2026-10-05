@@ -5,6 +5,7 @@ from collections.abc import Callable
 import pytest
 from fastapi.testclient import TestClient
 
+from lacuna.services import NotFoundError, delete_shelf
 from tests.conftest import FULL_ROW, GAPPY_ROW, FakeDetector, shelf_row
 
 FULL_SHELF = shelf_row(20, FULL_ROW) + shelf_row(200, FULL_ROW)
@@ -73,3 +74,23 @@ def test_worst_shelves_ranks_by_latest_scan(
 
 def test_worst_shelves_empty(client: TestClient) -> None:
     assert client.get("/reports/worst-shelves").json() == []
+
+
+def test_delete_shelf_removes_only_that_shelf(
+    client: TestClient, upload: Callable[..., str], fake_detector: FakeDetector
+) -> None:
+    fake_detector.boxes = GAPPY_SHELF
+    first = scan(client, upload, "a1")
+    scan(client, upload, "a1")
+    kept = scan(client, upload, "b2")
+
+    with client.app.state.sessionmaker() as session:  # type: ignore[attr-defined]
+        assert delete_shelf(session, "a1") == 2
+        with pytest.raises(NotFoundError):
+            delete_shelf(session, "a1")
+
+    assert client.get("/shelves/a1/history").status_code == 404
+    assert client.get(f"/results/{first['id']}").status_code == 404
+    assert client.get(f"/results/{first['id']}/overlay").status_code == 404
+    assert [r["shelf"] for r in client.get("/reports/worst-shelves").json()] == ["b2"]
+    assert client.get(f"/results/{kept['id']}/overlay").status_code == 200

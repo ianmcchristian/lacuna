@@ -12,6 +12,12 @@ export function change(value: number | null) {
 
 const dateTime = new Intl.DateTimeFormat(undefined, { dateStyle: "medium", timeStyle: "short" });
 const dateOnly = new Intl.DateTimeFormat(undefined, { month: "short", day: "numeric" });
+const timeOnly = new Intl.DateTimeFormat(undefined, { timeStyle: "short" });
 
 export const when = (iso: string) => dateTime.format(new Date(iso));
-export const day = (iso: string) => dateOnly.format(new Date(iso));
+
+/** Short label for a point in a series: the day, or the time if the series fits in one day. */
+export function axisLabel(first: string, last: string) {
+  const sameDay = dateOnly.format(new Date(first)) === dateOnly.format(new Date(last));
+  return (iso: string) => (sameDay ? timeOnly : dateOnly).format(new Date(iso));
+}
