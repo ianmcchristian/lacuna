@@ -1,7 +1,7 @@
 // One shelf over time: a chart, then every scan as a table.
 
 import { WAKING, getShelfHistory, overlayUrl } from "./api";
-import { change, percent, when } from "./format";
+import { change, percent, whenExact } from "./format";
 import { OccupancyChart } from "./OccupancyChart";
 import { PageHeading } from "./PageHeading";
 import { href } from "./route";
@@ -71,13 +71,13 @@ export function ShelfPage({ shelf, focus }: { shelf: string; focus: boolean }) {
               <tbody>
                 {scans.map((s) => (
                   <tr key={s.scan_id}>
-                    <th scope="row">{when(s.created_at)}</th>
+                    <th scope="row">{whenExact(s.created_at)}</th>
                     <td>{percent(s.occupancy)}</td>
                     <td>{change(s.occupancy_change)}</td>
                     <td>{s.gap_count}</td>
                     <td>
                       <a href={overlayUrl(s.scan_id)} target="_blank" rel="noreferrer">
-                        View<span className="visually-hidden"> photo from {when(s.created_at)} (opens in a new tab)</span>
+                        View<span className="visually-hidden"> photo from {whenExact(s.created_at)} (opens in a new tab)</span>
                       </a>
                     </td>
                   </tr>

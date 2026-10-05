@@ -13,11 +13,17 @@ export function change(value: number | null) {
 const dateTime = new Intl.DateTimeFormat(undefined, { dateStyle: "medium", timeStyle: "short" });
 const dateOnly = new Intl.DateTimeFormat(undefined, { month: "short", day: "numeric" });
 const timeOnly = new Intl.DateTimeFormat(undefined, { timeStyle: "short" });
+const timeSeconds = new Intl.DateTimeFormat(undefined, { timeStyle: "medium" });
+
+const dateTimeSeconds = new Intl.DateTimeFormat(undefined, { dateStyle: "medium", timeStyle: "medium" });
 
 export const when = (iso: string) => dateTime.format(new Date(iso));
+// scans of one shelf can be seconds apart, so the scan log keeps the seconds
+export const whenExact = (iso: string) => dateTimeSeconds.format(new Date(iso));
 
-/** Short label for a point in a series: the day, or the time if the series fits in one day. */
+/** Label for points in a series: the coarsest of day, time, or seconds that tells first and last apart. */
 export function axisLabel(first: string, last: string) {
-  const sameDay = dateOnly.format(new Date(first)) === dateOnly.format(new Date(last));
-  return (iso: string) => (sameDay ? timeOnly : dateOnly).format(new Date(iso));
+  const formats = [dateOnly, timeOnly, timeSeconds];
+  const fmt = formats.find((f) => f.format(new Date(first)) !== f.format(new Date(last))) ?? timeSeconds;
+  return (iso: string) => fmt.format(new Date(iso));
 }

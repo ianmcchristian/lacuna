@@ -105,6 +105,8 @@ describe("chart", () => {
     const days = axisLabel("2026-10-02T12:00:00Z", "2026-10-05T12:00:00Z");
     expect(sameDay("2026-10-05T12:30:00Z")).toMatch(/\d:30/);
     expect(days("2026-10-05T12:00:00Z")).toMatch(/Oct/);
+    const sameMinute = axisLabel("2026-10-05T12:00:05Z", "2026-10-05T12:00:50Z");
+    expect(sameMinute("2026-10-05T12:00:50Z")).toMatch(/:00:50/);
   });
 
   it("formats changes in points", () => {
