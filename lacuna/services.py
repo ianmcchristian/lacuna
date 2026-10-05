@@ -4,7 +4,7 @@ import time
 
 import numpy as np
 from numpy.typing import NDArray
-from sqlalchemy import delete, func, select
+from sqlalchemy import delete, func, select, update
 from sqlalchemy.orm import Session
 
 from lacuna.db.models import DetectionRecord, GapRecord, ImageBlob, ImageRecord, Scan, Shelf
@@ -139,6 +139,7 @@ def delete_shelf(session: Session, code: str) -> int:
     scan_ids = select(Scan.id).where(Scan.image_id.in_(image_ids))
     scans = session.scalar(select(func.count()).select_from(Scan).where(Scan.id.in_(scan_ids)))
     for statement in (
+        update(Shelf).where(Shelf.id == shelf.id).values(baseline_scan_id=None),
         delete(DetectionRecord).where(DetectionRecord.scan_id.in_(scan_ids)),
         delete(GapRecord).where(GapRecord.scan_id.in_(scan_ids)),
         delete(Scan).where(Scan.image_id.in_(image_ids)),

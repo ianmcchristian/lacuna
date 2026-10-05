@@ -129,6 +129,7 @@ test("shelf history pages meet WCAG 2.2 AA and work by keyboard", async ({ page 
     route.fulfill({
       json: {
         shelf: "aisle4-bay2",
+        baseline_scan_id: "s1",
         scans: [
           { scan_id: "s3", created_at: at(4), occupancy: 0.48, gap_count: 6, occupancy_change: -0.42 },
           { scan_id: "s2", created_at: at(3), occupancy: 0.9, gap_count: 1, occupancy_change: 0.18 },
@@ -136,6 +137,21 @@ test("shelf history pages meet WCAG 2.2 AA and work by keyboard", async ({ page 
         ],
       },
     }),
+  );
+
+  const product = (id: number, x1: number) => ({ id, x1, y1: 20, x2: x1 + 50, y2: 140, score: 0.9 });
+  await page.route("http://api.test/results/s3/missing", (route) =>
+    route.fulfill({
+      json: {
+        scan_id: "s3",
+        baseline_scan_id: "s1",
+        aligned: true,
+        gaps: [{ gap: { row: 0, x1: 240, y1: 20, x2: 370, y2: 140, width_ratio: 2.2 }, products: [product(7, 250), product(8, 310)] }],
+      },
+    }),
+  );
+  await page.route(/http:\/\/api\.test\/results\/s1\/products\/\d+\/crop/, (route) =>
+    route.fulfill({ path: fixture("overlay.jpg"), contentType: "image/jpeg" }),
   );
 
   await page.goto("/");
@@ -150,6 +166,9 @@ test("shelf history pages meet WCAG 2.2 AA and work by keyboard", async ({ page 
   await expect(page.getByRole("heading", { name: "Shelf aisle4-bay2" })).toBeFocused();
   await expect(page.getByRole("img", { name: "Occupancy over time for aisle4-bay2" })).toBeVisible();
   await expect(page.getByRole("table", { name: "Every scan, newest first" }).getByRole("row")).toHaveCount(4);
+  const soldOut = page.getByRole("region", { name: /What sold out since the baseline/ });
+  await expect(soldOut.getByRole("img")).toHaveCount(2);
+  await expect(page.getByRole("button", { name: /Baseline scan from/, pressed: true })).toHaveCount(1);
   await expectAccessible(page);
   await page.screenshot({ path: "test-results/shelf-history.png", fullPage: true });
 

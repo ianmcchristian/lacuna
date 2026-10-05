@@ -24,7 +24,11 @@ def shelf_history(
     except NotFoundError as err:
         raise HTTPException(404, str(err)) from err
     rows = reports.shelf_history(session, shelf.id, limit)
-    return ShelfHistory(shelf=code, scans=[HistoryPoint.model_validate(r) for r in rows])
+    return ShelfHistory(
+        shelf=code,
+        baseline_scan_id=shelf.baseline_scan_id,
+        scans=[HistoryPoint.model_validate(r) for r in rows],
+    )
 
 
 @router.get("/reports/worst-shelves")

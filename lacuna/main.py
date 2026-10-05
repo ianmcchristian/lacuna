@@ -8,7 +8,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from lacuna import __version__
-from lacuna.api import reports, scans, system
+from lacuna.api import baseline, reports, scans, system
 from lacuna.config import Settings
 from lacuna.db.session import make_engine, make_sessionmaker
 from lacuna.observability import configure_logging, observe_requests
@@ -65,4 +65,5 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(system.router)
     app.include_router(scans.router)
     app.include_router(reports.router)
+    app.include_router(baseline.router)
     return app

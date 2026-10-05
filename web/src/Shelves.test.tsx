@@ -1,8 +1,9 @@
 import { act, render, screen, within } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import axe from "axe-core";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { App } from "./App";
-import type { HistoryPoint, ShelfSummary } from "./api";
+import type { HistoryPoint, Missing, ShelfSummary } from "./api";
 import { axisLabel, change } from "./format";
 import { plot } from "./OccupancyChart";
 import { parseRoute } from "./route";
@@ -37,6 +38,7 @@ const point = (id: string, day: number, occupancy: number | null, change: number
 // newest first, as the API sends them
 const history = {
   shelf: "aisle4-bay2",
+  baseline_scan_id: null as string | null,
   scans: [point("s3", 4, 0.48, -0.42), point("s2", 3, 0.9, 0.18), point("s1", 2, 0.72, null)],
 };
 
@@ -191,5 +193,82 @@ describe("shelf page", () => {
     goTo("#/shelves/aisle4-bay2");
     expect(screen.getByRole("heading", { name: "Shelf aisle4-bay2" })).toHaveFocus();
     await screen.findByRole("table", { name: "Every scan, newest first" });
+  });
+});
+
+const product = (id: number, x1: number) => ({ id, x1, y1: 20, x2: x1 + 50, y2: 140, score: 0.9 });
+const missing: Missing = {
+  scan_id: "s3",
+  baseline_scan_id: "s1",
+  aligned: true,
+  gaps: [
+    { gap: { row: 0, x1: 240, y1: 20, x2: 370, y2: 140, width_ratio: 2.2 }, products: [product(7, 250), product(8, 310)] },
+    { gap: { row: 1, x1: 10, y1: 200, x2: 90, y2: 320, width_ratio: 1.1 }, products: [] },
+  ],
+};
+
+describe("baseline compare", () => {
+  it("shows what sold out of each gap since the baseline", async () => {
+    const fetchMock = mockApi({ status: 200, body: { ...history, baseline_scan_id: "s1" } }, { status: 200, body: missing });
+    window.location.hash = "#/shelves/aisle4-bay2";
+    const { container } = render(<App />);
+
+    const section = await screen.findByRole("region", { name: /What sold out since the baseline/ });
+    expect(await within(section).findByText(/Gap 1, shelf row 1: 2 products sold out/)).toBeInTheDocument();
+    expect(within(section).getByText(/Gap 2, shelf row 2: nothing in the baseline sat here/)).toBeInTheDocument();
+    const crops = within(section).getAllByRole("img");
+    expect(crops).toHaveLength(2);
+    expect(crops[0]).toHaveAttribute("src", expect.stringMatching(/\/results\/s1\/products\/7\/crop$/));
+    expect(crops[0]).toHaveAccessibleName("Product 1 of 2 that was in gap 1 in the baseline photo");
+    expect(fetchMock.mock.calls[1][0]).toMatch(/\/results\/s3\/missing$/);
+
+    const pressed = screen.getAllByRole("button", { name: /Baseline scan from/, pressed: true });
+    expect(pressed).toHaveLength(1);
+    await expectNoA11yViolations(container);
+  });
+
+  it("sets a baseline in place, keeps focus, and announces it", async () => {
+    const fetchMock = mockApi(
+      { status: 200, body: history },
+      { status: 200, body: { scan_id: "s1" } },
+      { status: 200, body: missing },
+    );
+    const user = userEvent.setup();
+    window.location.hash = "#/shelves/aisle4-bay2";
+    render(<App />);
+
+    await screen.findByText(/Press Baseline on a scan taken when the shelf was full/);
+    const buttons = screen.getAllByRole("button", { name: /Baseline scan from/ });
+    expect(buttons.every((b) => b.getAttribute("aria-pressed") === "false")).toBe(true);
+    await user.click(buttons[2]); // oldest scan
+
+    expect(await screen.findByText(/is now the baseline\./)).toBeInTheDocument();
+    expect(buttons[2]).toHaveAttribute("aria-pressed", "true");
+    expect(buttons[2]).toHaveFocus();
+    const [url, init] = fetchMock.mock.calls[1];
+    expect(url).toMatch(/\/shelves\/aisle4-bay2\/baseline$/);
+    expect(JSON.parse(init.body)).toEqual({ scan_id: "s1" });
+    expect(await screen.findByRole("region", { name: /What sold out/ })).toBeInTheDocument();
+  });
+
+  it("says when the photos can't be lined up", async () => {
+    mockApi(
+      { status: 200, body: { ...history, baseline_scan_id: "s1" } },
+      { status: 200, body: { ...missing, aligned: false, gaps: [] } },
+    );
+    window.location.hash = "#/shelves/aisle4-bay2";
+    render(<App />);
+    expect(await screen.findByText(/don't line up well enough to compare/)).toBeInTheDocument();
+  });
+
+  it("announces a failed baseline change", async () => {
+    mockApi({ status: 200, body: history }, { status: 422, body: { detail: "scan s1 is not a scan of shelf aisle4-bay2" } });
+    const user = userEvent.setup();
+    window.location.hash = "#/shelves/aisle4-bay2";
+    render(<App />);
+    const buttons = await screen.findAllByRole("button", { name: /Baseline scan from/ });
+    await user.click(buttons[0]);
+    expect(await screen.findByRole("alert")).toHaveTextContent("not a scan of shelf");
+    expect(buttons[0]).toHaveAttribute("aria-pressed", "false");
   });
 });

@@ -327,6 +327,37 @@ tbody th {
   stroke-width: 2;
 }
 
+/* outlined until pressed; the pressed one is the baseline */
+button.toggle {
+  color: var(--accent);
+  background: var(--bg);
+  border: 2px solid var(--accent);
+}
+
+button.toggle[aria-pressed="true"] {
+  color: var(--accent-text);
+  background: var(--accent);
+}
+
+.missing {
+  padding-left: 1.25rem;
+}
+
+.crops {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  padding: 0;
+  list-style: none;
+}
+
+.crops img {
+  height: 7rem;
+  width: auto;
+  border: 1px solid var(--muted);
+  border-radius: 4px;
+}
+
 .visually-hidden {
   position: absolute;
   width: 1px;

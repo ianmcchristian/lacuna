@@ -84,7 +84,30 @@ class HistoryPoint(BaseModel):
 
 class ShelfHistory(BaseModel):
     shelf: str
+    baseline_scan_id: str | None = Field(description="The stocked scan gaps are compared to.")
     scans: list[HistoryPoint]
+
+
+class BaselineIn(BaseModel):
+    scan_id: str = Field(min_length=1, max_length=32)
+
+
+class DetectionOut(BoxOut):
+    id: int
+
+
+class MissingGap(BaseModel):
+    gap: GapOut
+    products: list[DetectionOut] = Field(
+        description="Products in the baseline scan that sat where this gap is now."
+    )
+
+
+class MissingOut(BaseModel):
+    scan_id: str
+    baseline_scan_id: str | None
+    aligned: bool = Field(description="False if the photos couldn't be lined up, or no baseline.")
+    gaps: list[MissingGap]
 
 
 class ShelfReport(BaseModel):

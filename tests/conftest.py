@@ -47,6 +47,27 @@ def image_bytes(ext: str = ".jpg", size: tuple[int, int] = (480, 640)) -> bytes:
     return bytes(buf.tobytes())
 
 
+def textured(seed: int = 0, size: tuple[int, int] = (480, 640)) -> NDArray[np.uint8]:
+    """Busy, repeatable picture with lots of corners, so photos can be lined up."""
+    rng = np.random.default_rng(seed)
+    image = np.full((*size, 3), 235, dtype=np.uint8)
+    for _ in range(160):
+        x, y = int(rng.integers(0, size[1])), int(rng.integers(0, size[0]))
+        w, h = int(rng.integers(8, 60)), int(rng.integers(8, 60))
+        color = tuple(int(c) for c in rng.integers(0, 255, 3))
+        cv2.rectangle(image, (x, y), (x + w, y + h), color, -1)
+    for i in range(12):
+        org = (int(rng.integers(0, size[1] - 120)), int(rng.integers(20, size[0])))
+        cv2.putText(image, f"SKU{seed}{i}", org, cv2.FONT_HERSHEY_SIMPLEX, 0.8, (20, 20, 20), 2)
+    return image
+
+
+def textured_bytes(seed: int = 0) -> bytes:
+    ok, buf = cv2.imencode(".jpg", textured(seed), [cv2.IMWRITE_JPEG_QUALITY, 90])
+    assert ok
+    return bytes(buf.tobytes())
+
+
 @pytest.fixture
 def settings(tmp_path: Path) -> Settings:
     return Settings(
@@ -77,11 +98,10 @@ def client(settings: Settings, fake_detector: FakeDetector) -> Iterator[TestClie
 def upload(client: TestClient):  # type: ignore[no-untyped-def]
     """Upload a photo and return the image id."""
 
-    def _upload(shelf: str | None = None) -> str:
+    def _upload(shelf: str | None = None, photo: bytes | None = None) -> str:
         data = {"shelf": shelf} if shelf else {}
-        resp = client.post(
-            "/images", files={"file": ("shelf.jpg", image_bytes(), "image/jpeg")}, data=data
-        )
+        photo = image_bytes() if photo is None else photo
+        resp = client.post("/images", files={"file": ("shelf.jpg", photo, "image/jpeg")}, data=data)
         assert resp.status_code == 201, resp.text
         return str(resp.json()["id"])
 

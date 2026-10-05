@@ -39,7 +39,24 @@ export interface HistoryPoint {
 
 export interface ShelfHistory {
   shelf: string;
+  baseline_scan_id: string | null;
   scans: HistoryPoint[]; // newest first
+}
+
+export interface Product {
+  id: number;
+  x1: number;
+  y1: number;
+  x2: number;
+  y2: number;
+  score: number;
+}
+
+export interface Missing {
+  scan_id: string;
+  baseline_scan_id: string | null;
+  aligned: boolean;
+  gaps: Array<{ gap: Gap; products: Product[] }>;
 }
 
 export class ApiError extends Error {
@@ -92,6 +109,18 @@ export const getWorstShelves = (limit = 50) => request<ShelfSummary[]>(`/reports
 
 export const getShelfHistory = (shelf: string, limit = 200) =>
   request<ShelfHistory>(`/shelves/${encodeURIComponent(shelf)}/history?limit=${limit}`);
+
+export const setBaseline = (shelf: string, scanId: string) =>
+  request<{ scan_id: string }>(`/shelves/${encodeURIComponent(shelf)}/baseline`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ scan_id: scanId }),
+  });
+
+/** For each gap in a scan, the baseline products that used to sit there. */
+export const getMissing = (scanId: string) => request<Missing>(`/results/${scanId}/missing`);
+
+export const cropUrl = (scanId: string, productId: number) => `${API_URL}/results/${scanId}/products/${productId}/crop`;
 
 export const overlayUrl = (scanId: string) => `${API_URL}/results/${scanId}/overlay`;
 

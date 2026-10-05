@@ -1,8 +1,9 @@
 """ORM tables.
 
 shelves 1--* images 1--* scans 1--* detections
-                |              1--* gaps
-                1--1 image_blobs
+   |            |              1--* gaps
+   |            1--1 image_blobs
+   *--1 scans (the shelf's stocked baseline, optional)
 """
 
 import uuid
@@ -50,6 +51,16 @@ class Shelf(Base):
     id: Mapped[int] = mapped_column(primary_key=True)
     code: Mapped[str] = mapped_column(String(64), unique=True)
     created_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow)
+    # a scan of this shelf when it was stocked; later gaps are compared against it.
+    # use_alter: shelves -> scans -> images -> shelves is a cycle, so this FK is added last
+    baseline_scan_id: Mapped[str | None] = mapped_column(
+        ForeignKey(
+            "scans.id",
+            use_alter=True,
+            ondelete="SET NULL",
+            name="fk_shelves_baseline_scan_id_scans",
+        )
+    )
 
 
 class ImageRecord(Base):
